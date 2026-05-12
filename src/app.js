@@ -41,6 +41,7 @@ function normalize(value) {
 }
 
 function setPhotoPlaceholder(message) {
+  clearActiveBlobUrl();
   photoWrapper.replaceChildren();
   const text = document.createElement('p');
   text.className = 'placeholder';
@@ -110,7 +111,10 @@ async function renderPhoto(photo) {
     image.alt = 'Photo à deviner';
     photoWrapper.append(image);
   } catch (error) {
-    setPhotoPlaceholder('Impossible de charger cette photo Immich.');
+    const message = photo.source === 'immich'
+      ? 'Impossible de charger cette photo Immich.'
+      : 'Photo non affichable.';
+    setPhotoPlaceholder(message);
   }
 }
 
