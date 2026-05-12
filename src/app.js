@@ -48,7 +48,8 @@ const state = {
   apiKey: '',
   activeBlobUrl: '',
   guessCoordinates: null,
-  resultVisible: false
+  resultVisible: false,
+  resultDistanceKm: null
 };
 
 function normalize(value) {
@@ -193,8 +194,10 @@ function drawMapOverlay() {
   line.setAttribute('y2', String(realPoint.y));
   mapLines.append(line);
 
-  const errorDistance = distanceKm(state.guessCoordinates, state.currentPhoto);
-  mapDistance.textContent = `Distance: ${Math.round(errorDistance).toLocaleString('fr-FR')} km`;
+  const shownDistance = Number.isFinite(state.resultDistanceKm)
+    ? state.resultDistanceKm
+    : distanceKm(state.guessCoordinates, state.currentPhoto);
+  mapDistance.textContent = `Distance: ${Math.round(shownDistance).toLocaleString('fr-FR')} km`;
   mapDistance.classList.remove('hidden');
 }
 
@@ -306,6 +309,7 @@ async function showCurrentPhoto() {
   guessForm.reset();
   state.guessCoordinates = null;
   state.resultVisible = false;
+  state.resultDistanceKm = null;
   drawMapOverlay();
   includeDateInput.checked = state.includeDate;
   guessDateLabel.classList.toggle('hidden', !state.includeDate);
@@ -474,6 +478,7 @@ guessMap.addEventListener('click', (event) => {
   }
 
   state.guessCoordinates = coordinates;
+  state.resultDistanceKm = null;
   drawMapOverlay();
   feedback.textContent = `Supposition placée: ${coordinates.latitude.toFixed(3)}, ${coordinates.longitude.toFixed(3)}`;
 });
@@ -487,12 +492,13 @@ guessForm.addEventListener('submit', (event) => {
 
   const guessedDate = document.getElementById('guess-date').value;
   if (!state.guessCoordinates) {
-    feedback.textContent = 'Clique sur la carte pour poser ta supposition.';
+    feedback.textContent = 'Cliquez sur la carte pour poser votre supposition.';
     return;
   }
 
   const dateOk = !state.includeDate || guessedDate === state.currentPhoto.takenAt;
   const distance = distanceKm(state.guessCoordinates, state.currentPhoto);
+  state.resultDistanceKm = distance;
   const location = state.currentPhoto.locationLabel || state.currentPhoto.country || 'lieu inconnu';
   const locationText = `Lieu réel: ${location} • Distance: ${Math.round(distance).toLocaleString('fr-FR')} km`;
   const dateText = state.includeDate
