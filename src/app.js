@@ -253,7 +253,6 @@ settingsForm.addEventListener('submit', async (event) => {
   state.includeDate = includeDateInput.checked;
 
   let photos = [];
-  state.apiKey = '';
 
   if (serverUrl && apiKey) {
     try {
@@ -266,10 +265,12 @@ settingsForm.addEventListener('submit', async (event) => {
       state.apiKey = apiKey;
       settingsStatus.textContent = `Photos chargées depuis Immich: ${photos.length}`;
     } catch (error) {
-      settingsStatus.textContent = `Échec du chargement Immich (${error.message}). Vérifie l'URL, la clé API et les droits.`;
+      state.apiKey = '';
+      settingsStatus.textContent = `Échec du chargement Immich (${error.message}). Vérifiez l'URL, la clé API et les droits.`;
     }
   } else {
     photos = [...demoPhotos];
+    state.apiKey = '';
     settingsStatus.textContent = 'Mode démo actif (renseigne URL + clé API pour Immich).';
   }
 
