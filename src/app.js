@@ -89,7 +89,12 @@ async function getRenderableImageUrl(photo) {
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+    throw new Error(`HTTP ${response.status} ${response.statusText}`.trim());
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.toLowerCase().startsWith('image/')) {
+    throw new Error(`Réponse non image (${contentType || 'type inconnu'})`);
   }
 
   clearActiveBlobUrl();
@@ -111,8 +116,9 @@ async function renderPhoto(photo) {
     image.alt = 'Photo à deviner';
     photoWrapper.append(image);
   } catch (error) {
+    const details = error?.message ? `: ${error.message}` : '';
     const message = photo.source === 'immich'
-      ? 'Impossible de charger cette photo Immich.'
+      ? `Impossible de charger cette photo Immich${details}`
       : 'Photo non affichable.';
     setPhotoPlaceholder(message);
   }
