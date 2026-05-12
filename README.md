@@ -16,8 +16,7 @@ Prototype d'extension navigateur qui ouvre **Immich Guessr** en pleine page, ave
 1. Ouvrir `chrome://extensions`
 2. Activer le mode développeur
 3. Cliquer sur **Load unpacked**
-4. Sélectionner ce dossier:
-   - `/home/runner/work/immich-guessr-exp/immich-guessr-exp`
+4. Sélectionner le dossier racine de ce dépôt (le dossier qui contient `manifest.json`)
 5. Cliquer sur l'icône de l'extension pour ouvrir le jeu
 
 ## Notes
