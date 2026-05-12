@@ -13,6 +13,8 @@ const mapMarkers = document.getElementById('map-markers');
 const mapDistance = document.getElementById('map-distance');
 const IMMICH_PAGE_SIZE = 200;
 const IMMICH_MAX_PAGES = 200;
+const MAX_UINT32 = 2 ** 32;
+const MAP_DRAG_THRESHOLD_PX = 2;
 
 const demoPhotos = [
   {
@@ -394,8 +396,7 @@ function getRandomInt(maxExclusive) {
 
   if (globalThis.crypto?.getRandomValues) {
     const randomValues = new Uint32Array(1);
-    const maxUint32 = 2 ** 32;
-    const limit = Math.floor(maxUint32 / maxExclusive) * maxExclusive;
+    const limit = Math.floor(MAX_UINT32 / maxExclusive) * maxExclusive;
     let randomValue = 0;
     do {
       globalThis.crypto.getRandomValues(randomValues);
@@ -720,7 +721,7 @@ guessMap.addEventListener('pointermove', (event) => {
 
   const deltaX = event.clientX - state.map.dragStartPoint.x;
   const deltaY = event.clientY - state.map.dragStartPoint.y;
-  if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+  if (Math.abs(deltaX) > MAP_DRAG_THRESHOLD_PX || Math.abs(deltaY) > MAP_DRAG_THRESHOLD_PX) {
     state.map.dragMoved = true;
   }
   const centerWorldX = state.map.dragStartCenterWorld.x - deltaX;
