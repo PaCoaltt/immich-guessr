@@ -15,11 +15,14 @@ const IMMICH_PAGE_SIZE = 200;
 const IMMICH_MAX_PAGES = 200;
 const MAX_UINT32 = 2 ** 32;
 const MAP_DRAG_THRESHOLD_PX = 2;
+const MAP_MAX_ZOOM = 19;
+const MAP_REVEAL_PADDING_PX = 28;
+const MAP_REVEAL_ANIMATION_MS = 550;
 
 const demoPhotos = [
   {
     id: 'demo-1',
-    imageUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=2400&q=100',
     country: 'France',
     locationLabel: 'Paris',
     latitude: 48.85837,
@@ -28,7 +31,7 @@ const demoPhotos = [
   },
   {
     id: 'demo-2',
-    imageUrl: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=2400&q=100',
     country: 'Suisse',
     locationLabel: 'Oeschinensee',
     latitude: 46.49811,
@@ -37,7 +40,7 @@ const demoPhotos = [
   },
   {
     id: 'demo-3',
-    imageUrl: 'https://images.unsplash.com/photo-1533929736458-ca588d08c8be?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1533929736458-ca588d08c8be?auto=format&fit=crop&w=2400&q=100',
     country: 'Japon',
     locationLabel: 'Tokyo',
     latitude: 35.6762,
@@ -59,12 +62,13 @@ const state = {
   map: {
     zoom: 1,
     center: { latitude: 20, longitude: 0 },
-    maxZoom: 5,
+    maxZoom: MAP_MAX_ZOOM,
     minZoom: 1,
     dragPointerId: null,
     dragStartPoint: null,
     dragStartCenterWorld: null,
-    dragMoved: false
+    dragMoved: false,
+    revealAnimationFrame: null
   }
 };
 
@@ -146,6 +150,14 @@ function worldXToLongitude(worldX, zoom) {
 function worldYToLatitude(worldY, zoom) {
   const mercatorY = Math.PI - ((2 * Math.PI * worldY) / mapSize(zoom));
   return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(mercatorY) - Math.exp(-mercatorY)));
+}
+
+function normalizeLongitude(longitude) {
+  return ((((longitude + 180) % 360) + 360) % 360) - 180;
+}
+
+function shortestLongitudeDelta(fromLongitude, toLongitude) {
+  return normalizeLongitude(toLongitude - fromLongitude);
 }
 
 function getMapCenterWorld() {
@@ -305,6 +317,141 @@ function drawMapOverlay() {
   mapDistance.classList.remove('hidden');
 }
 
+function cancelRevealAnimation() {
+  if (state.map.revealAnimationFrame === null) {
+    return;
+  }
+  cancelAnimationFrame(state.map.revealAnimationFrame);
+  state.map.revealAnimationFrame = null;
+}
+
+function animateMapViewTo(targetZoom, targetCenter) {
+  cancelRevealAnimation();
+  const clampedTargetZoom = Math.min(state.map.maxZoom, Math.max(state.map.minZoom, targetZoom));
+  const normalizedTargetCenter = normalizeCoordinates(targetCenter.latitude, targetCenter.longitude);
+  if (!normalizedTargetCenter) {
+    drawMapOverlay();
+    return;
+  }
+
+  const startZoom = state.map.zoom;
+  const startCenter = {
+    latitude: state.map.center.latitude,
+    longitude: state.map.center.longitude
+  };
+  const zoomDelta = clampedTargetZoom - startZoom;
+  const latitudeDelta = normalizedTargetCenter.latitude - startCenter.latitude;
+  const longitudeDelta = shortestLongitudeDelta(startCenter.longitude, normalizedTargetCenter.longitude);
+  const hasMovement = zoomDelta !== 0
+    || Math.abs(latitudeDelta) > Number.EPSILON
+    || Math.abs(longitudeDelta) > Number.EPSILON;
+
+  if (!hasMovement) {
+    drawMapOverlay();
+    return;
+  }
+
+  const startedAt = performance.now();
+  const step = (now) => {
+    const elapsed = now - startedAt;
+    const progress = Math.min(1, elapsed / MAP_REVEAL_ANIMATION_MS);
+    const eased = 1 - ((1 - progress) ** 3);
+    const nextZoom = Math.round(startZoom + zoomDelta * eased);
+    const nextCenter = normalizeCoordinates(
+      startCenter.latitude + latitudeDelta * eased,
+      startCenter.longitude + longitudeDelta * eased
+    );
+    state.map.zoom = Math.min(state.map.maxZoom, Math.max(state.map.minZoom, nextZoom));
+    if (nextCenter) {
+      state.map.center = nextCenter;
+    }
+    drawMapOverlay();
+
+    if (progress >= 1) {
+      state.map.zoom = clampedTargetZoom;
+      state.map.center = normalizedTargetCenter;
+      state.map.revealAnimationFrame = null;
+      drawMapOverlay();
+      return;
+    }
+
+    state.map.revealAnimationFrame = requestAnimationFrame(step);
+  };
+
+  state.map.revealAnimationFrame = requestAnimationFrame(step);
+}
+
+function fitMapForReveal(guessCoordinates, actualCoordinates) {
+  const normalizedGuess = normalizeCoordinates(guessCoordinates?.latitude, guessCoordinates?.longitude);
+  const normalizedActual = normalizeCoordinates(actualCoordinates?.latitude, actualCoordinates?.longitude);
+  if (!normalizedGuess || !normalizedActual) {
+    drawMapOverlay();
+    return;
+  }
+
+  const rect = guessMap.getBoundingClientRect();
+  if (!rect.width || !rect.height) {
+    drawMapOverlay();
+    return;
+  }
+
+  const usableWidth = Math.max(1, rect.width - (MAP_REVEAL_PADDING_PX * 2));
+  const usableHeight = Math.max(1, rect.height - (MAP_REVEAL_PADDING_PX * 2));
+  let fittedZoom = state.map.minZoom;
+  let fittedCenterWorld = null;
+
+  for (let zoom = state.map.maxZoom; zoom >= state.map.minZoom; zoom -= 1) {
+    const worldSize = mapSize(zoom);
+    const guessX = longitudeToWorldX(normalizedGuess.longitude, zoom);
+    const guessY = latitudeToWorldY(normalizedGuess.latitude, zoom);
+    const actualX = longitudeToWorldX(normalizedActual.longitude, zoom);
+    const actualY = latitudeToWorldY(normalizedActual.latitude, zoom);
+    let deltaX = actualX - guessX;
+    if (deltaX > worldSize / 2) {
+      deltaX -= worldSize;
+    } else if (deltaX < -worldSize / 2) {
+      deltaX += worldSize;
+    }
+    const deltaY = actualY - guessY;
+    const spanX = Math.abs(deltaX);
+    const spanY = Math.abs(deltaY);
+
+    if (spanX <= usableWidth && spanY <= usableHeight) {
+      fittedZoom = zoom;
+      fittedCenterWorld = {
+        x: guessX + (deltaX / 2),
+        y: guessY + (deltaY / 2)
+      };
+      break;
+    }
+  }
+
+  if (!fittedCenterWorld) {
+    const zoom = state.map.minZoom;
+    const worldSize = mapSize(zoom);
+    const guessX = longitudeToWorldX(normalizedGuess.longitude, zoom);
+    const guessY = latitudeToWorldY(normalizedGuess.latitude, zoom);
+    const actualX = longitudeToWorldX(normalizedActual.longitude, zoom);
+    const actualY = latitudeToWorldY(normalizedActual.latitude, zoom);
+    let deltaX = actualX - guessX;
+    if (deltaX > worldSize / 2) {
+      deltaX -= worldSize;
+    } else if (deltaX < -worldSize / 2) {
+      deltaX += worldSize;
+    }
+    fittedCenterWorld = {
+      x: guessX + (deltaX / 2),
+      y: guessY + ((actualY - guessY) / 2)
+    };
+  }
+
+  const targetCenter = {
+    latitude: worldYToLatitude(fittedCenterWorld.y, fittedZoom),
+    longitude: worldXToLongitude(fittedCenterWorld.x, fittedZoom)
+  };
+  animateMapViewTo(fittedZoom, targetCenter);
+}
+
 function setPhotoPlaceholder(message) {
   clearActiveBlobUrl();
   photoWrapper.replaceChildren();
@@ -336,35 +483,55 @@ function clearActiveBlobUrl() {
 }
 
 async function getRenderableImageUrl(photo) {
-  const safeImageUrl = sanitizeImageUrl(photo.imageUrl);
-  if (!safeImageUrl) {
-    return '';
-  }
-
   if (photo.source !== 'immich') {
+    const safeImageUrl = sanitizeImageUrl(photo.imageUrl);
+    if (!safeImageUrl) {
+      return '';
+    }
     clearActiveBlobUrl();
     return safeImageUrl;
   }
 
-  const response = await fetch(safeImageUrl, {
-    headers: {
-      Accept: 'image/*',
-      'x-api-key': state.apiKey
+  const candidateUrls = Array.isArray(photo.imageUrls)
+    ? photo.imageUrls
+    : [photo.imageUrl];
+  let lastError = null;
+
+  for (const candidateUrl of candidateUrls) {
+    const safeImageUrl = sanitizeImageUrl(candidateUrl);
+    if (!safeImageUrl) {
+      continue;
     }
-  });
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText}`.trim());
+    try {
+      const response = await fetch(safeImageUrl, {
+        headers: {
+          Accept: 'image/*',
+          'x-api-key': state.apiKey
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} ${response.statusText}`.trim());
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.toLowerCase().startsWith('image/')) {
+        throw new Error(`Réponse non image (${contentType || 'type inconnu'})`);
+      }
+
+      clearActiveBlobUrl();
+      state.activeBlobUrl = URL.createObjectURL(await response.blob());
+      return state.activeBlobUrl;
+    } catch (error) {
+      lastError = error;
+    }
   }
 
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.toLowerCase().startsWith('image/')) {
-    throw new Error(`Réponse non image (${contentType || 'type inconnu'})`);
+  if (lastError) {
+    throw lastError;
   }
-
-  clearActiveBlobUrl();
-  state.activeBlobUrl = URL.createObjectURL(await response.blob());
-  return state.activeBlobUrl;
+  return '';
 }
 
 async function renderPhoto(photo) {
@@ -431,6 +598,7 @@ function getRandomPhoto() {
 }
 
 async function showCurrentPhoto() {
+  cancelRevealAnimation();
   state.currentPhoto = getRandomPhoto();
   if (!state.currentPhoto) {
     setPhotoPlaceholder('Aucune photo géolocalisée disponible avec ces paramètres.');
@@ -475,7 +643,11 @@ function parseImmichPhoto(serverUrl, asset) {
   const takenAt = takenAtRaw ? takenAtRaw.slice(0, 10) : '';
   return {
     id: safeId,
-    imageUrl: `${serverUrl}/api/assets/${safeId}/thumbnail`,
+    imageUrl: `${serverUrl}/api/assets/${safeId}/original`,
+    imageUrls: [
+      `${serverUrl}/api/assets/${safeId}/original`,
+      `${serverUrl}/api/assets/${safeId}/thumbnail`
+    ],
     source: 'immich',
     country,
     locationLabel,
@@ -779,7 +951,7 @@ guessForm.addEventListener('submit', (event) => {
 
   feedback.textContent = `${locationText}${dateText ? ` • ${dateText}` : ''}`;
   state.resultVisible = true;
-  drawMapOverlay();
+  fitMapForReveal(state.guessCoordinates, state.currentPhoto);
   nextPhotoButton.classList.remove('hidden');
 });
 
