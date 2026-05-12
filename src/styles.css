@@ -124,6 +124,85 @@ button:hover {
   margin-top: 16px;
 }
 
+.guess-map {
+  position: relative;
+  overflow: hidden;
+  border: 4px solid var(--ink);
+  background: #7ec8ff;
+  aspect-ratio: 1 / 1;
+  cursor: crosshair;
+  transition: aspect-ratio 0.2s ease;
+}
+
+.guess-map.expanded {
+  aspect-ratio: 1.6 / 1;
+}
+
+.guess-map-tiles {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.guess-map-tiles img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  pointer-events: none;
+}
+
+.map-lines,
+.map-markers {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.map-line {
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-dasharray: 7 5;
+}
+
+.map-marker {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.map-marker.guess {
+  background: var(--accent);
+}
+
+.map-marker.actual {
+  background: #00ff7f;
+}
+
+.map-distance {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--ink);
+  color: #fff;
+  padding: 6px 8px;
+  border: 2px solid #fff;
+  font-size: 0.8rem;
+}
+
+.map-attribution {
+  margin: 6px 0 0;
+  font-size: 0.7rem;
+  text-transform: none;
+}
+
 .feedback {
   margin-top: 12px;
   min-height: 2em;
