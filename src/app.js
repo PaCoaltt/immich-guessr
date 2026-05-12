@@ -194,7 +194,7 @@ function drawMapOverlay() {
   mapLines.append(line);
 
   const errorDistance = distanceKm(state.guessCoordinates, state.currentPhoto);
-  mapDistance.textContent = `Erreur: ${Math.round(errorDistance).toLocaleString('fr-FR')} km`;
+  mapDistance.textContent = `Distance: ${Math.round(errorDistance).toLocaleString('fr-FR')} km`;
   mapDistance.classList.remove('hidden');
 }
 
@@ -283,13 +283,13 @@ async function renderPhoto(photo) {
 }
 
 function getRandomPhoto() {
-  const playablePhotos = state.photos.filter(hasCoordinates);
-  if (!playablePhotos.length) {
+  const geotaggedPhotos = state.photos.filter(hasCoordinates);
+  if (!geotaggedPhotos.length) {
     return null;
   }
 
-  const index = getRandomIndex(playablePhotos.length);
-  return playablePhotos[index];
+  const index = getRandomIndex(geotaggedPhotos.length);
+  return geotaggedPhotos[index];
 }
 
 async function showCurrentPhoto() {
@@ -494,7 +494,7 @@ guessForm.addEventListener('submit', (event) => {
   const dateOk = !state.includeDate || guessedDate === state.currentPhoto.takenAt;
   const distance = distanceKm(state.guessCoordinates, state.currentPhoto);
   const location = state.currentPhoto.locationLabel || state.currentPhoto.country || 'lieu inconnu';
-  const locationText = `Lieu réel: ${location} • Erreur: ${Math.round(distance).toLocaleString('fr-FR')} km`;
+  const locationText = `Lieu réel: ${location} • Distance: ${Math.round(distance).toLocaleString('fr-FR')} km`;
   const dateText = state.includeDate
     ? dateOk
       ? 'Date correcte'
