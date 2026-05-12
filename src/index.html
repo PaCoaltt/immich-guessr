@@ -39,26 +39,30 @@
         </aside>
 
         <section class="panel game-panel">
-          <div id="photo-wrapper" class="photo-wrapper">
-            <p class="placeholder">Lance une partie pour afficher une photo.</p>
-          </div>
-
           <form id="guess-form" class="guess-form hidden">
-            <label>
-              Votre supposition (cliquez sur la carte)
-            </label>
-            <div id="guess-map" class="guess-map" aria-label="Carte de supposition">
-              <div class="guess-map-tiles" aria-hidden="true">
-                <img src="https://tile.openstreetmap.org/1/0/0.png" alt="" />
-                <img src="https://tile.openstreetmap.org/1/1/0.png" alt="" />
-                <img src="https://tile.openstreetmap.org/1/0/1.png" alt="" />
-                <img src="https://tile.openstreetmap.org/1/1/1.png" alt="" />
+            <div class="game-main">
+              <div id="photo-wrapper" class="photo-wrapper">
+                <p class="placeholder">Lance une partie pour afficher une photo.</p>
               </div>
-              <svg id="map-lines" class="map-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
-              <div id="map-markers" class="map-markers" aria-hidden="true"></div>
-              <div id="map-distance" class="map-distance hidden"></div>
+
+              <div class="map-panel">
+                <label class="map-label">
+                  Votre supposition (cliquez sur la carte)
+                </label>
+                <div class="guess-map-frame">
+                  <div id="guess-map" class="guess-map" aria-label="Carte de supposition">
+                    <div id="map-viewport" class="guess-map-viewport" aria-hidden="true">
+                      <div id="guess-map-tiles" class="guess-map-tiles"></div>
+                    </div>
+                    <svg id="map-lines" class="map-lines" aria-hidden="true"></svg>
+                    <div id="map-markers" class="map-markers" aria-hidden="true"></div>
+                    <div id="map-distance" class="map-distance hidden"></div>
+                  </div>
+                </div>
+                <p class="map-attribution">© OpenStreetMap contributors</p>
+              </div>
             </div>
-            <p class="map-attribution">© OpenStreetMap contributors</p>
+
             <label id="guess-date-label">
               Votre date (YYYY-MM-DD)
               <input id="guess-date" type="date" />
