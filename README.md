@@ -21,5 +21,10 @@ Prototype d'extension navigateur qui ouvre **Immich Guessr** en pleine page, ave
 
 ## Notes
 
+- L'interface est actuellement en français (`lang="fr"`).
+- Aucune internationalisation n'est encore implémentée (le prototype cible d'abord le français).
 - Le prototype tente plusieurs endpoints Immich pour rester compatible selon versions.
+- Le chargement Immich est limité aux 200 premiers assets récupérés.
+- Les permissions hôtes larges sont déclarées en **optionnel** et ne sont demandées qu'au moment où vous lancez une partie avec votre URL Immich.
+- L'extension demandera l'autorisation d'accéder au domaine Immich renseigné.
 - Si le chargement Immich échoue, des photos de démonstration sont utilisées.

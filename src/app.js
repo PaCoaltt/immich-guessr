@@ -38,8 +38,38 @@ function normalize(value) {
   return (value || '').trim().toLowerCase();
 }
 
+function setPhotoPlaceholder(message) {
+  photoWrapper.replaceChildren();
+  const text = document.createElement('p');
+  text.className = 'placeholder';
+  text.textContent = message;
+  photoWrapper.append(text);
+}
+
+function sanitizeImageUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return '';
+    }
+    return url.href;
+  } catch (error) {
+    return '';
+  }
+}
+
 function renderPhoto(photo) {
-  photoWrapper.innerHTML = `<img src="${photo.imageUrl}" alt="Photo à deviner" />`;
+  const safeImageUrl = sanitizeImageUrl(photo.imageUrl);
+  if (!safeImageUrl) {
+    setPhotoPlaceholder('Photo non affichable.');
+    return;
+  }
+
+  photoWrapper.replaceChildren();
+  const image = document.createElement('img');
+  image.src = safeImageUrl;
+  image.alt = 'Photo à deviner';
+  photoWrapper.append(image);
 }
 
 function getRandomPhoto() {
@@ -54,7 +84,7 @@ function getRandomPhoto() {
 function showCurrentPhoto() {
   state.currentPhoto = getRandomPhoto();
   if (!state.currentPhoto) {
-    photoWrapper.innerHTML = '<p class="placeholder">Aucune photo disponible avec ces paramètres.</p>';
+    setPhotoPlaceholder('Aucune photo disponible avec ces paramètres.');
     guessForm.classList.add('hidden');
     nextPhotoButton.classList.add('hidden');
     return;
@@ -70,15 +100,30 @@ function showCurrentPhoto() {
 }
 
 function parseImmichPhoto(serverUrl, asset) {
+  const rawId = asset?.id;
+  if (rawId === undefined || rawId === null || String(rawId).trim() === '') {
+    return null;
+  }
+
+  const safeId = encodeURIComponent(String(rawId));
   const country = asset?.exifInfo?.country || asset?.exifInfo?.city || '';
   const takenAtRaw = asset?.fileCreatedAt || asset?.localDateTime;
   const takenAt = takenAtRaw ? takenAtRaw.slice(0, 10) : '';
   return {
-    id: asset.id,
-    imageUrl: `${serverUrl}/api/assets/${asset.id}/thumbnail`,
+    id: safeId,
+    imageUrl: `${serverUrl}/api/assets/${safeId}/thumbnail`,
     country,
     takenAt
   };
+}
+
+async function ensureHostPermission(serverUrl) {
+  if (typeof chrome === 'undefined' || !chrome.permissions?.request) {
+    return true;
+  }
+
+  const origin = new URL(serverUrl).origin;
+  return chrome.permissions.request({ origins: [`${origin}/*`] });
 }
 
 async function fetchImmichPhotos(serverUrl, apiKey) {
@@ -112,13 +157,14 @@ async function fetchImmichPhotos(serverUrl, apiKey) {
             ? data.items
             : [];
 
-      return assets.map((asset) => parseImmichPhoto(cleanServerUrl, asset));
+      return assets.map((asset) => parseImmichPhoto(cleanServerUrl, asset)).filter(Boolean);
     } catch (error) {
       lastError = error;
     }
   }
 
-  throw lastError || new Error('Impossible de charger les photos Immich.');
+  const details = lastError?.message ? ` (${lastError.message})` : '';
+  throw new Error(`Impossible de charger les photos Immich${details}.`);
 }
 
 settingsForm.addEventListener('submit', async (event) => {
@@ -135,10 +181,15 @@ settingsForm.addEventListener('submit', async (event) => {
 
   if (serverUrl && apiKey) {
     try {
+      const hasPermission = await ensureHostPermission(serverUrl);
+      if (!hasPermission) {
+        throw new Error('Accès au domaine Immich refusé');
+      }
+
       photos = await fetchImmichPhotos(serverUrl, apiKey);
       settingsStatus.textContent = `Photos chargées depuis Immich: ${photos.length}`;
     } catch (error) {
-      settingsStatus.textContent = 'Échec du chargement Immich, passage en mode démo.';
+      settingsStatus.textContent = `Échec du chargement Immich (${error.message}), passage en mode démo.`;
     }
   } else {
     settingsStatus.textContent = 'Mode démo actif (renseigne URL + clé API pour Immich).';
