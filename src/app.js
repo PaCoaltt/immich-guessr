@@ -7,9 +7,14 @@ const feedback = document.getElementById('feedback');
 const nextPhotoButton = document.getElementById('next-photo');
 const includeDateInput = document.getElementById('include-date');
 const guessMap = document.getElementById('guess-map');
+const guessMapTiles = document.getElementById('guess-map-tiles');
 const mapLines = document.getElementById('map-lines');
 const mapMarkers = document.getElementById('map-markers');
 const mapDistance = document.getElementById('map-distance');
+const IMMICH_PAGE_SIZE = 200;
+const IMMICH_MAX_PAGES = 200;
+const MAX_UINT32 = 2 ** 32;
+const MAP_DRAG_THRESHOLD_PX = 2;
 
 const demoPhotos = [
   {
@@ -49,7 +54,18 @@ const state = {
   activeBlobUrl: '',
   guessCoordinates: null,
   resultVisible: false,
-  resultDistanceKm: null
+  resultDistanceKm: null,
+  remainingPhotoIds: [],
+  map: {
+    zoom: 1,
+    center: { latitude: 20, longitude: 0 },
+    maxZoom: 5,
+    minZoom: 1,
+    dragPointerId: null,
+    dragStartPoint: null,
+    dragStartCenterWorld: null,
+    dragMoved: false
+  }
 };
 
 function normalize(value) {
@@ -98,20 +114,6 @@ function hasCoordinates(photo) {
   return Number.isFinite(photo?.latitude) && Number.isFinite(photo?.longitude);
 }
 
-function getRandomIndex(maxExclusive) {
-  if (!Number.isInteger(maxExclusive) || maxExclusive <= 0) {
-    return 0;
-  }
-
-  if (globalThis.crypto?.getRandomValues) {
-    const randomValues = new Uint32Array(1);
-    globalThis.crypto.getRandomValues(randomValues);
-    return randomValues[0] % maxExclusive;
-  }
-
-  return Date.now() % maxExclusive;
-}
-
 function normalizeCoordinates(latitude, longitude) {
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     return null;
@@ -122,16 +124,62 @@ function normalizeCoordinates(latitude, longitude) {
   return { latitude: lat, longitude: lng };
 }
 
+function mapSize(zoom) {
+  return 256 * (2 ** zoom);
+}
+
+function longitudeToWorldX(longitude, zoom) {
+  return ((longitude + 180) / 360) * mapSize(zoom);
+}
+
+function latitudeToWorldY(latitude, zoom) {
+  const clampedLat = clampLatitude(latitude);
+  const sinLatitude = Math.sin((clampedLat * Math.PI) / 180);
+  const y = 0.5 - (Math.log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * Math.PI));
+  return y * mapSize(zoom);
+}
+
+function worldXToLongitude(worldX, zoom) {
+  return (worldX / mapSize(zoom)) * 360 - 180;
+}
+
+function worldYToLatitude(worldY, zoom) {
+  const mercatorY = Math.PI - ((2 * Math.PI * worldY) / mapSize(zoom));
+  return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(mercatorY) - Math.exp(-mercatorY)));
+}
+
+function getMapCenterWorld() {
+  return {
+    x: longitudeToWorldX(state.map.center.longitude, state.map.zoom),
+    y: latitudeToWorldY(state.map.center.latitude, state.map.zoom)
+  };
+}
+
+function setMapCenterFromWorld(worldX, worldY) {
+  const worldSize = mapSize(state.map.zoom);
+  const wrappedX = ((((worldX % worldSize) + worldSize) % worldSize) + worldSize) % worldSize;
+  const clampedY = Math.min(worldSize, Math.max(0, worldY));
+  const longitude = worldXToLongitude(wrappedX, state.map.zoom);
+  const latitude = worldYToLatitude(clampedY, state.map.zoom);
+  const normalized = normalizeCoordinates(latitude, longitude);
+  if (!normalized) {
+    return;
+  }
+
+  state.map.center = normalized;
+}
+
 function coordinatesToPoint(latitude, longitude) {
   const rect = guessMap.getBoundingClientRect();
   if (!rect.width || !rect.height) {
     return null;
   }
 
-  const clampedLat = clampLatitude(latitude);
-  const x = ((longitude + 180) / 360) * rect.width;
-  const mercatorY = Math.log(Math.tan(Math.PI / 4 + (clampedLat * Math.PI) / 360));
-  const y = ((1 - mercatorY / Math.PI) / 2) * rect.height;
+  const centerWorld = getMapCenterWorld();
+  const pointWorldX = longitudeToWorldX(longitude, state.map.zoom);
+  const pointWorldY = latitudeToWorldY(latitude, state.map.zoom);
+  const x = pointWorldX - centerWorld.x + rect.width / 2;
+  const y = pointWorldY - centerWorld.y + rect.height / 2;
   return { x, y };
 }
 
@@ -143,9 +191,11 @@ function pointToCoordinates(clientX, clientY) {
 
   const x = Math.min(rect.width, Math.max(0, clientX - rect.left));
   const y = Math.min(rect.height, Math.max(0, clientY - rect.top));
-  const longitude = (x / rect.width) * 360 - 180;
-  const mercatorY = Math.PI * (1 - (2 * y) / rect.height);
-  const latitude = (180 / Math.PI) * (2 * Math.atan(Math.exp(mercatorY)) - Math.PI / 2);
+  const centerWorld = getMapCenterWorld();
+  const worldX = centerWorld.x - rect.width / 2 + x;
+  const worldY = centerWorld.y - rect.height / 2 + y;
+  const longitude = worldXToLongitude(worldX, state.map.zoom);
+  const latitude = worldYToLatitude(worldY, state.map.zoom);
   return normalizeCoordinates(latitude, longitude);
 }
 
@@ -169,12 +219,55 @@ function createMarker(point, className, title) {
   return marker;
 }
 
+function renderMapTiles() {
+  const rect = guessMap.getBoundingClientRect();
+  if (!rect.width || !rect.height) {
+    return;
+  }
+
+  const centerWorld = getMapCenterWorld();
+  const topLeftWorldX = centerWorld.x - rect.width / 2;
+  const topLeftWorldY = centerWorld.y - rect.height / 2;
+  const tileSize = 256;
+  const tileCount = 2 ** state.map.zoom;
+  const minTileX = Math.floor(topLeftWorldX / tileSize);
+  const maxTileX = Math.floor((topLeftWorldX + rect.width) / tileSize);
+  const minTileY = Math.floor(topLeftWorldY / tileSize);
+  const maxTileY = Math.floor((topLeftWorldY + rect.height) / tileSize);
+  const fragment = document.createDocumentFragment();
+
+  for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
+    for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
+      if (tileY < 0 || tileY >= tileCount) {
+        continue;
+      }
+
+      const wrappedTileX = ((tileX % tileCount) + tileCount) % tileCount;
+      const tile = document.createElement('img');
+      tile.src = `https://tile.openstreetmap.org/${state.map.zoom}/${wrappedTileX}/${tileY}.png`;
+      tile.alt = '';
+      tile.decoding = 'async';
+      tile.draggable = false;
+      tile.style.width = `${tileSize}px`;
+      tile.style.height = `${tileSize}px`;
+      tile.style.left = `${tileX * tileSize - topLeftWorldX}px`;
+      tile.style.top = `${tileY * tileSize - topLeftWorldY}px`;
+      fragment.append(tile);
+    }
+  }
+
+  guessMapTiles.replaceChildren(fragment);
+}
+
 function drawMapOverlay() {
   mapLines.replaceChildren();
   mapMarkers.replaceChildren();
   mapDistance.classList.add('hidden');
   mapDistance.textContent = '';
-  guessMap.classList.toggle('expanded', state.resultVisible);
+  renderMapTiles();
+
+  const rect = guessMap.getBoundingClientRect();
+  mapLines.setAttribute('viewBox', `0 0 ${Math.max(1, rect.width)} ${Math.max(1, rect.height)}`);
 
   if (!state.currentPhoto || !state.guessCoordinates) {
     return;
@@ -296,14 +389,45 @@ async function renderPhoto(photo) {
   }
 }
 
+function getRandomInt(maxExclusive) {
+  if (!Number.isInteger(maxExclusive) || maxExclusive <= 0) {
+    return 0;
+  }
+
+  if (globalThis.crypto?.getRandomValues) {
+    const randomValues = new Uint32Array(1);
+    const limit = Math.floor(MAX_UINT32 / maxExclusive) * maxExclusive;
+    let randomValue = 0;
+    do {
+      globalThis.crypto.getRandomValues(randomValues);
+      randomValue = randomValues[0];
+    } while (randomValue >= limit);
+    return randomValue % maxExclusive;
+  }
+
+  return Math.floor(Math.random() * maxExclusive);
+}
+
+function refillRandomPhotoQueue() {
+  const geotaggedPhotoIds = state.photos.filter(hasCoordinates).map((photo) => photo.id);
+  for (let index = geotaggedPhotoIds.length - 1; index > 0; index -= 1) {
+    const randomIndex = getRandomInt(index + 1);
+    [geotaggedPhotoIds[index], geotaggedPhotoIds[randomIndex]] = [geotaggedPhotoIds[randomIndex], geotaggedPhotoIds[index]];
+  }
+  state.remainingPhotoIds = geotaggedPhotoIds;
+}
+
 function getRandomPhoto() {
-  const geotaggedPhotos = state.photos.filter(hasCoordinates);
-  if (!geotaggedPhotos.length) {
+  if (!state.remainingPhotoIds.length) {
+    refillRandomPhotoQueue();
+  }
+
+  const nextPhotoId = state.remainingPhotoIds.pop();
+  if (!nextPhotoId) {
     return null;
   }
 
-  const index = getRandomIndex(geotaggedPhotos.length);
-  return geotaggedPhotos[index];
+  return state.photos.find((photo) => photo.id === nextPhotoId) || null;
 }
 
 async function showCurrentPhoto() {
@@ -318,6 +442,8 @@ async function showCurrentPhoto() {
   await renderPhoto(state.currentPhoto);
   feedback.textContent = '';
   guessForm.reset();
+  state.map.zoom = 1;
+  state.map.center = { latitude: 20, longitude: 0 };
   state.guessCoordinates = null;
   state.resultVisible = false;
   state.resultDistanceKm = null;
@@ -368,66 +494,113 @@ async function ensureHostPermission(serverUrl) {
   return chrome.permissions.request({ origins: [`${origin}/*`] });
 }
 
+function extractAssetsFromResponse(data) {
+  return Array.isArray(data)
+    ? data
+    : Array.isArray(data?.assets)
+      ? data.assets
+      : Array.isArray(data?.assets?.items)
+        ? data.assets.items
+        : Array.isArray(data?.items)
+          ? data.items
+          : [];
+}
+
+function hasMorePages(data, assetsLength, pageSize, page) {
+  const total = Number(data?.total ?? data?.assets?.total ?? data?.count ?? data?.assets?.count);
+  if (Number.isFinite(total)) {
+    return page * pageSize < total;
+  }
+
+  const totalPages = Number(data?.totalPages ?? data?.assets?.totalPages ?? data?.pages ?? data?.assets?.pages);
+  if (Number.isFinite(totalPages)) {
+    return page < totalPages;
+  }
+
+  if (typeof data?.nextPage === 'boolean') {
+    return data.nextPage;
+  }
+  if (typeof data?.assets?.nextPage === 'boolean') {
+    return data.assets.nextPage;
+  }
+  if (typeof data?.hasNextPage === 'boolean') {
+    return data.hasNextPage;
+  }
+  if (typeof data?.assets?.hasNextPage === 'boolean') {
+    return data.assets.hasNextPage;
+  }
+
+  return assetsLength >= pageSize;
+}
+
+async function loadAllPages({ makeRequest, pageSize }) {
+  const collected = [];
+
+  for (let page = 1; page <= IMMICH_MAX_PAGES; page += 1) {
+    const response = await makeRequest(page);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    const assets = extractAssetsFromResponse(data);
+    if (!assets.length) {
+      break;
+    }
+
+    collected.push(...assets);
+    if (!hasMorePages(data, assets.length, pageSize, page)) {
+      break;
+    }
+  }
+
+  return collected;
+}
+
 async function fetchImmichPhotos(serverUrl, apiKey) {
   const cleanServerUrl = serverUrl.replace(/\/$/, '');
-  const requests = [
-    {
-      endpoint: `${cleanServerUrl}/api/search/metadata`,
-      init: {
+  const headers = {
+    Accept: 'application/json',
+    'x-api-key': apiKey
+  };
+
+  const loaders = [
+    () => loadAllPages({
+      pageSize: IMMICH_PAGE_SIZE,
+      makeRequest: (page) => fetch(`${cleanServerUrl}/api/search/metadata`, {
         method: 'POST',
         headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey
+          ...headers,
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          page: 1,
-          size: 200,
+          page,
+          size: IMMICH_PAGE_SIZE,
           withExif: true
         })
+      })
+    }),
+    () => loadAllPages({
+      pageSize: IMMICH_PAGE_SIZE,
+      makeRequest: (page) => fetch(`${cleanServerUrl}/api/assets?page=${page}&size=${IMMICH_PAGE_SIZE}&withExif=true`, { headers })
+    }),
+    () => loadAllPages({
+      pageSize: IMMICH_PAGE_SIZE,
+      makeRequest: (page) => {
+        const skip = (page - 1) * IMMICH_PAGE_SIZE;
+        return fetch(`${cleanServerUrl}/api/assets?take=${IMMICH_PAGE_SIZE}&skip=${skip}&withExif=true`, { headers });
       }
-    },
-    {
-      endpoint: `${cleanServerUrl}/api/assets?page=1&size=200&withExif=true`,
-      init: {
-        headers: {
-          Accept: 'application/json',
-          'x-api-key': apiKey
-        }
-      }
-    },
-    {
-      endpoint: `${cleanServerUrl}/api/assets?take=200&withExif=true`,
-      init: {
-        headers: {
-          Accept: 'application/json',
-          'x-api-key': apiKey
-        }
-      }
-    }
+    })
   ];
 
   let lastError = null;
 
-  for (const request of requests) {
+  for (const loader of loaders) {
     try {
-      const response = await fetch(request.endpoint, request.init);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      const assets = await loader();
+      if (!assets.length) {
+        continue;
       }
-
-      const data = await response.json();
-      const assets = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.assets)
-          ? data.assets
-          : Array.isArray(data?.assets?.items)
-            ? data?.assets?.items
-            : Array.isArray(data?.items)
-              ? data.items
-              : [];
-
       return assets.map((asset) => parseImmichPhoto(cleanServerUrl, asset)).filter(Boolean);
     } catch (error) {
       lastError = error;
@@ -436,6 +609,44 @@ async function fetchImmichPhotos(serverUrl, apiKey) {
 
   const details = lastError?.message ? ` (${lastError.message})` : '';
   throw new Error(`Impossible de charger les photos Immich${details}.`);
+}
+
+function setGuessAtPoint(clientX, clientY) {
+  if (!state.currentPhoto || state.resultVisible) {
+    return;
+  }
+
+  const coordinates = pointToCoordinates(clientX, clientY);
+  if (!coordinates) {
+    return;
+  }
+
+  state.guessCoordinates = coordinates;
+  state.resultDistanceKm = null;
+  drawMapOverlay();
+  feedback.textContent = `Supposition placée: ${coordinates.latitude.toFixed(3)}, ${coordinates.longitude.toFixed(3)}`;
+}
+
+function setMapZoom(nextZoom, anchorClientX, anchorClientY) {
+  const clampedZoom = Math.min(state.map.maxZoom, Math.max(state.map.minZoom, nextZoom));
+  if (clampedZoom === state.map.zoom) {
+    return;
+  }
+
+  const anchorCoordinates = pointToCoordinates(anchorClientX, anchorClientY);
+  state.map.zoom = clampedZoom;
+  if (anchorCoordinates) {
+    const rect = guessMap.getBoundingClientRect();
+    const anchorX = Math.min(rect.width, Math.max(0, anchorClientX - rect.left));
+    const anchorY = Math.min(rect.height, Math.max(0, anchorClientY - rect.top));
+    const anchorWorldX = longitudeToWorldX(anchorCoordinates.longitude, state.map.zoom);
+    const anchorWorldY = latitudeToWorldY(anchorCoordinates.latitude, state.map.zoom);
+    const centerWorldX = anchorWorldX - (anchorX - rect.width / 2);
+    const centerWorldY = anchorWorldY - (anchorY - rect.height / 2);
+    setMapCenterFromWorld(centerWorldX, centerWorldY);
+  }
+
+  drawMapOverlay();
 }
 
 settingsForm.addEventListener('submit', async (event) => {
@@ -475,6 +686,7 @@ settingsForm.addEventListener('submit', async (event) => {
   state.photos = normalizedFilter
     ? photos.filter((photo) => normalize(photo.country) === normalizedFilter)
     : photos;
+  state.remainingPhotoIds = [];
 
   if (state.photos.length && !state.photos.some(hasCoordinates)) {
     settingsStatus.textContent = `${settingsStatus.textContent} • Aucune photo avec coordonnées GPS`;
@@ -483,20 +695,62 @@ settingsForm.addEventListener('submit', async (event) => {
   showCurrentPhoto();
 });
 
-guessMap.addEventListener('click', (event) => {
-  if (!state.currentPhoto || state.resultVisible) {
+guessMap.addEventListener('wheel', (event) => {
+  event.preventDefault();
+  const direction = event.deltaY > 0 ? -1 : 1;
+  const nextZoom = state.map.zoom + direction;
+  setMapZoom(nextZoom, event.clientX, event.clientY);
+}, { passive: false });
+
+guessMap.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0) {
     return;
   }
 
-  const coordinates = pointToCoordinates(event.clientX, event.clientY);
-  if (!coordinates) {
+  state.map.dragPointerId = event.pointerId;
+  state.map.dragStartPoint = { x: event.clientX, y: event.clientY };
+  state.map.dragStartCenterWorld = getMapCenterWorld();
+  state.map.dragMoved = false;
+  guessMap.setPointerCapture(event.pointerId);
+});
+
+guessMap.addEventListener('pointermove', (event) => {
+  if (state.map.dragPointerId !== event.pointerId || !state.map.dragStartPoint || !state.map.dragStartCenterWorld) {
     return;
   }
 
-  state.guessCoordinates = coordinates;
-  state.resultDistanceKm = null;
+  const deltaX = event.clientX - state.map.dragStartPoint.x;
+  const deltaY = event.clientY - state.map.dragStartPoint.y;
+  if (Math.abs(deltaX) > MAP_DRAG_THRESHOLD_PX || Math.abs(deltaY) > MAP_DRAG_THRESHOLD_PX) {
+    state.map.dragMoved = true;
+  }
+  const centerWorldX = state.map.dragStartCenterWorld.x - deltaX;
+  const centerWorldY = state.map.dragStartCenterWorld.y - deltaY;
+  setMapCenterFromWorld(centerWorldX, centerWorldY);
   drawMapOverlay();
-  feedback.textContent = `Supposition placée: ${coordinates.latitude.toFixed(3)}, ${coordinates.longitude.toFixed(3)}`;
+});
+
+guessMap.addEventListener('pointerup', (event) => {
+  if (state.map.dragPointerId !== event.pointerId) {
+    return;
+  }
+
+  const hasDragged = state.map.dragMoved;
+  state.map.dragPointerId = null;
+  state.map.dragStartPoint = null;
+  state.map.dragStartCenterWorld = null;
+  state.map.dragMoved = false;
+
+  if (!hasDragged) {
+    setGuessAtPoint(event.clientX, event.clientY);
+  }
+});
+
+guessMap.addEventListener('pointercancel', () => {
+  state.map.dragPointerId = null;
+  state.map.dragStartPoint = null;
+  state.map.dragStartCenterWorld = null;
+  state.map.dragMoved = false;
 });
 
 guessForm.addEventListener('submit', (event) => {
@@ -534,13 +788,11 @@ nextPhotoButton.addEventListener('click', () => {
 });
 
 window.addEventListener('resize', () => {
-  if (!state.currentPhoto) {
+  if (guessForm.classList.contains('hidden')) {
     return;
   }
 
-  if (state.guessCoordinates || state.resultVisible) {
-    drawMapOverlay();
-  }
+  drawMapOverlay();
 });
 
 (async function restoreSettings() {
