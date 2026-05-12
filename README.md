@@ -27,4 +27,4 @@ Prototype d'extension navigateur qui ouvre **Immich Guessr** en pleine page, ave
 - Le chargement Immich est limité aux 200 premiers assets récupérés.
 - Les permissions hôtes larges sont déclarées en **optionnel** et ne sont demandées qu'au moment où vous lancez une partie avec votre URL Immich.
 - L'extension demandera l'autorisation d'accéder au domaine Immich renseigné.
-- Si le chargement Immich échoue, des photos de démonstration sont utilisées.
+- Si le chargement Immich échoue avec URL + clé API, le mode démo n'est pas activé automatiquement (pour éviter toute confusion).
