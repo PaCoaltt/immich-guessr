@@ -227,10 +227,10 @@ async function fetchImmichPhotos(serverUrl, apiKey) {
         : Array.isArray(data?.assets)
           ? data.assets
           : Array.isArray(data?.assets?.items)
-            ? data.assets.items
-          : Array.isArray(data?.items)
-            ? data.items
-            : [];
+            ? data?.assets?.items
+            : Array.isArray(data?.items)
+              ? data.items
+              : [];
 
       return assets.map((asset) => parseImmichPhoto(cleanServerUrl, asset)).filter(Boolean);
     } catch (error) {
