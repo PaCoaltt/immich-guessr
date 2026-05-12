@@ -79,6 +79,17 @@ function firstCoordinate(source, keys) {
   return NaN;
 }
 
+function firstCoordinateFromSources(sources, keys) {
+  for (const source of sources) {
+    const coordinate = firstCoordinate(source, keys);
+    if (Number.isFinite(coordinate)) {
+      return coordinate;
+    }
+  }
+
+  return NaN;
+}
+
 function clampLatitude(latitude) {
   return Math.min(85.05112878, Math.max(-85.05112878, latitude));
 }
@@ -324,11 +335,15 @@ function parseImmichPhoto(serverUrl, asset) {
   }
 
   const safeId = encodeURIComponent(String(rawId));
-  const exif = asset?.exifInfo || {};
+  const exif = asset?.exifInfo || asset?.exif || asset?.exifData || {};
+  const exifGps = exif?.gps || {};
+  const exifLocation = exif?.location || {};
+  const assetLocation = asset?.location || {};
+  const coordinateSources = [exif, exifGps, exifLocation, assetLocation, asset];
   const country = exif.country || exif.state || exif.city || '';
   const locationLabel = exif.city || exif.state || exif.country || asset?.address || '';
-  const latitude = firstCoordinate(exif, ['latitude', 'lat', 'gpsLatitude']);
-  const longitude = firstCoordinate(exif, ['longitude', 'long', 'lon', 'lng', 'gpsLongitude']);
+  const latitude = firstCoordinateFromSources(coordinateSources, ['latitude', 'lat', 'gpsLatitude']);
+  const longitude = firstCoordinateFromSources(coordinateSources, ['longitude', 'long', 'lon', 'lng', 'gpsLongitude']);
   const normalizedCoordinates = normalizeCoordinates(latitude, longitude);
   const takenAtRaw = asset?.fileCreatedAt || asset?.localDateTime;
   const takenAt = takenAtRaw ? takenAtRaw.slice(0, 10) : '';
@@ -367,12 +382,13 @@ async function fetchImmichPhotos(serverUrl, apiKey) {
         },
         body: JSON.stringify({
           page: 1,
-          size: 200
+          size: 200,
+          withExif: true
         })
       }
     },
     {
-      endpoint: `${cleanServerUrl}/api/assets?page=1&size=200`,
+      endpoint: `${cleanServerUrl}/api/assets?page=1&size=200&withExif=true`,
       init: {
         headers: {
           Accept: 'application/json',
@@ -381,7 +397,7 @@ async function fetchImmichPhotos(serverUrl, apiKey) {
       }
     },
     {
-      endpoint: `${cleanServerUrl}/api/assets?take=200`,
+      endpoint: `${cleanServerUrl}/api/assets?take=200&withExif=true`,
       init: {
         headers: {
           Accept: 'application/json',
