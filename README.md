@@ -10,6 +10,8 @@ Prototype d'extension navigateur qui ouvre **Immich Guessr** en pleine page, ave
   - Filtre par pays
   - Mode lieu seul / lieu + date
 - Chargement des photos depuis Immich (URL + clé API), avec mode démo en fallback
+- Guess du lieu via clic sur une carte mondiale
+- Après validation: affichage du guess + lieu réel reliés par un trait pointillé avec distance d'erreur
 
 ## Installation (Chrome/Chromium)
 
@@ -25,6 +27,7 @@ Prototype d'extension navigateur qui ouvre **Immich Guessr** en pleine page, ave
 - Aucune internationalisation n'est encore implémentée (le prototype cible d'abord le français).
 - Le prototype tente plusieurs endpoints Immich pour rester compatible selon versions.
 - Le chargement Immich est limité aux 200 premiers assets récupérés.
+- Seules les photos avec coordonnées GPS sont jouables.
 - Les permissions hôtes larges sont déclarées en **optionnel** et ne sont demandées qu'au moment où vous lancez une partie avec votre URL Immich.
 - L'extension demandera l'autorisation d'accéder au domaine Immich renseigné.
 - Si le chargement Immich échoue avec URL + clé API, le mode démo n'est pas activé automatiquement (pour éviter toute confusion).

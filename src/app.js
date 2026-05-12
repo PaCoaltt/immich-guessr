@@ -6,24 +6,37 @@ const photoWrapper = document.getElementById('photo-wrapper');
 const feedback = document.getElementById('feedback');
 const nextPhotoButton = document.getElementById('next-photo');
 const includeDateInput = document.getElementById('include-date');
+const guessMap = document.getElementById('guess-map');
+const mapLines = document.getElementById('map-lines');
+const mapMarkers = document.getElementById('map-markers');
+const mapDistance = document.getElementById('map-distance');
 
 const demoPhotos = [
   {
     id: 'demo-1',
     imageUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80',
     country: 'France',
+    locationLabel: 'Paris',
+    latitude: 48.85837,
+    longitude: 2.294481,
     takenAt: '2024-05-11'
   },
   {
     id: 'demo-2',
     imageUrl: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1200&q=80',
     country: 'Suisse',
+    locationLabel: 'Oeschinensee',
+    latitude: 46.49811,
+    longitude: 7.72661,
     takenAt: '2023-09-02'
   },
   {
     id: 'demo-3',
     imageUrl: 'https://images.unsplash.com/photo-1533929736458-ca588d08c8be?auto=format&fit=crop&w=1200&q=80',
     country: 'Japon',
+    locationLabel: 'Tokyo',
+    latitude: 35.6762,
+    longitude: 139.6503,
     takenAt: '2022-01-20'
   }
 ];
@@ -33,11 +46,142 @@ const state = {
   currentPhoto: null,
   includeDate: true,
   apiKey: '',
-  activeBlobUrl: ''
+  activeBlobUrl: '',
+  guessCoordinates: null,
+  resultVisible: false
 };
 
 function normalize(value) {
   return (value || '').trim().toLowerCase();
+}
+
+function parseCoordinate(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value.replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : NaN;
+  }
+
+  return NaN;
+}
+
+function firstCoordinate(source, keys) {
+  for (const key of keys) {
+    const parsed = parseCoordinate(source?.[key]);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return NaN;
+}
+
+function clampLatitude(latitude) {
+  return Math.min(85.05112878, Math.max(-85.05112878, latitude));
+}
+
+function hasCoordinates(photo) {
+  return Number.isFinite(photo?.latitude) && Number.isFinite(photo?.longitude);
+}
+
+function normalizeCoordinates(latitude, longitude) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
+
+  const lat = clampLatitude(latitude);
+  const lng = ((((longitude + 180) % 360) + 360) % 360) - 180;
+  return { latitude: lat, longitude: lng };
+}
+
+function coordinatesToPoint(latitude, longitude) {
+  const rect = guessMap.getBoundingClientRect();
+  if (!rect.width || !rect.height) {
+    return null;
+  }
+
+  const clampedLat = clampLatitude(latitude);
+  const x = ((longitude + 180) / 360) * rect.width;
+  const mercatorY = Math.log(Math.tan(Math.PI / 4 + (clampedLat * Math.PI) / 360));
+  const y = ((1 - mercatorY / Math.PI) / 2) * rect.height;
+  return { x, y };
+}
+
+function pointToCoordinates(clientX, clientY) {
+  const rect = guessMap.getBoundingClientRect();
+  if (!rect.width || !rect.height) {
+    return null;
+  }
+
+  const x = Math.min(rect.width, Math.max(0, clientX - rect.left));
+  const y = Math.min(rect.height, Math.max(0, clientY - rect.top));
+  const longitude = (x / rect.width) * 360 - 180;
+  const mercatorY = Math.PI * (1 - (2 * y) / rect.height);
+  const latitude = (180 / Math.PI) * (2 * Math.atan(Math.exp(mercatorY)) - Math.PI / 2);
+  return normalizeCoordinates(latitude, longitude);
+}
+
+function distanceKm(first, second) {
+  const earthRadiusKm = 6371;
+  const lat1 = (first.latitude * Math.PI) / 180;
+  const lat2 = (second.latitude * Math.PI) / 180;
+  const deltaLat = ((second.latitude - first.latitude) * Math.PI) / 180;
+  const deltaLng = ((second.longitude - first.longitude) * Math.PI) / 180;
+  const haversine = Math.sin(deltaLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
+  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
+function createMarker(point, className, title) {
+  const marker = document.createElement('div');
+  marker.className = `map-marker ${className}`;
+  marker.style.left = `${point.x}px`;
+  marker.style.top = `${point.y}px`;
+  marker.title = title;
+  return marker;
+}
+
+function drawMapOverlay() {
+  mapLines.replaceChildren();
+  mapMarkers.replaceChildren();
+  mapDistance.classList.add('hidden');
+  mapDistance.textContent = '';
+  guessMap.classList.toggle('expanded', state.resultVisible);
+
+  if (!state.currentPhoto || !state.guessCoordinates) {
+    return;
+  }
+
+  const guessPoint = coordinatesToPoint(state.guessCoordinates.latitude, state.guessCoordinates.longitude);
+  if (!guessPoint) {
+    return;
+  }
+
+  mapMarkers.append(createMarker(guessPoint, 'guess', 'Votre guess'));
+  if (!state.resultVisible || !hasCoordinates(state.currentPhoto)) {
+    return;
+  }
+
+  const realPoint = coordinatesToPoint(state.currentPhoto.latitude, state.currentPhoto.longitude);
+  if (!realPoint) {
+    return;
+  }
+
+  mapMarkers.append(createMarker(realPoint, 'actual', state.currentPhoto.locationLabel || state.currentPhoto.country || 'Lieu réel'));
+
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('class', 'map-line');
+  line.setAttribute('x1', String(guessPoint.x));
+  line.setAttribute('y1', String(guessPoint.y));
+  line.setAttribute('x2', String(realPoint.x));
+  line.setAttribute('y2', String(realPoint.y));
+  mapLines.append(line);
+
+  const errorDistance = distanceKm(state.guessCoordinates, state.currentPhoto);
+  mapDistance.textContent = `Erreur: ${Math.round(errorDistance).toLocaleString('fr-FR')} km`;
+  mapDistance.classList.remove('hidden');
 }
 
 function setPhotoPlaceholder(message) {
@@ -125,18 +269,19 @@ async function renderPhoto(photo) {
 }
 
 function getRandomPhoto() {
-  if (!state.photos.length) {
+  const playablePhotos = state.photos.filter(hasCoordinates);
+  if (!playablePhotos.length) {
     return null;
   }
 
-  const index = Math.floor(Math.random() * state.photos.length);
-  return state.photos[index];
+  const index = Math.floor(Math.random() * playablePhotos.length);
+  return playablePhotos[index];
 }
 
 async function showCurrentPhoto() {
   state.currentPhoto = getRandomPhoto();
   if (!state.currentPhoto) {
-    setPhotoPlaceholder('Aucune photo disponible avec ces paramètres.');
+    setPhotoPlaceholder('Aucune photo géolocalisée disponible avec ces paramètres.');
     guessForm.classList.add('hidden');
     nextPhotoButton.classList.add('hidden');
     return;
@@ -145,6 +290,9 @@ async function showCurrentPhoto() {
   await renderPhoto(state.currentPhoto);
   feedback.textContent = '';
   guessForm.reset();
+  state.guessCoordinates = null;
+  state.resultVisible = false;
+  drawMapOverlay();
   includeDateInput.checked = state.includeDate;
   guessDateLabel.classList.toggle('hidden', !state.includeDate);
   guessForm.classList.remove('hidden');
@@ -158,7 +306,12 @@ function parseImmichPhoto(serverUrl, asset) {
   }
 
   const safeId = encodeURIComponent(String(rawId));
-  const country = asset?.exifInfo?.country || asset?.exifInfo?.city || '';
+  const exif = asset?.exifInfo || {};
+  const country = exif.country || exif.state || exif.city || '';
+  const locationLabel = exif.city || exif.state || exif.country || asset?.address || '';
+  const latitude = firstCoordinate(exif, ['latitude', 'lat', 'gpsLatitude']);
+  const longitude = firstCoordinate(exif, ['longitude', 'long', 'lon', 'lng', 'gpsLongitude']);
+  const normalizedCoordinates = normalizeCoordinates(latitude, longitude);
   const takenAtRaw = asset?.fileCreatedAt || asset?.localDateTime;
   const takenAt = takenAtRaw ? takenAtRaw.slice(0, 10) : '';
   return {
@@ -166,6 +319,9 @@ function parseImmichPhoto(serverUrl, asset) {
     imageUrl: `${serverUrl}/api/assets/${safeId}/thumbnail`,
     source: 'immich',
     country,
+    locationLabel,
+    latitude: normalizedCoordinates?.latitude ?? NaN,
+    longitude: normalizedCoordinates?.longitude ?? NaN,
     takenAt
   };
 }
@@ -269,7 +425,8 @@ settingsForm.addEventListener('submit', async (event) => {
 
       photos = await fetchImmichPhotos(serverUrl, apiKey);
       state.apiKey = apiKey;
-      settingsStatus.textContent = `Photos chargées depuis Immich: ${photos.length}`;
+      const geoCount = photos.filter(hasCoordinates).length;
+      settingsStatus.textContent = `Photos chargées depuis Immich: ${photos.length} (${geoCount} géolocalisées)`;
     } catch (error) {
       state.apiKey = '';
       settingsStatus.textContent = `Échec du chargement Immich (${error.message}). Vérifiez l'URL, la clé API et les droits.`;
@@ -285,7 +442,26 @@ settingsForm.addEventListener('submit', async (event) => {
     ? photos.filter((photo) => normalize(photo.country) === normalizedFilter)
     : photos;
 
+  if (state.photos.length && !state.photos.some(hasCoordinates)) {
+    settingsStatus.textContent = `${settingsStatus.textContent} • Aucune photo avec coordonnées GPS`;
+  }
+
   showCurrentPhoto();
+});
+
+guessMap.addEventListener('click', (event) => {
+  if (!state.currentPhoto || state.resultVisible) {
+    return;
+  }
+
+  const coordinates = pointToCoordinates(event.clientX, event.clientY);
+  if (!coordinates) {
+    return;
+  }
+
+  state.guessCoordinates = coordinates;
+  drawMapOverlay();
+  feedback.textContent = `Guess placé: ${coordinates.latitude.toFixed(3)}, ${coordinates.longitude.toFixed(3)}`;
 });
 
 guessForm.addEventListener('submit', (event) => {
@@ -295,13 +471,16 @@ guessForm.addEventListener('submit', (event) => {
     return;
   }
 
-  const guessedCountry = normalize(document.getElementById('guess-country').value);
   const guessedDate = document.getElementById('guess-date').value;
+  if (!state.guessCoordinates) {
+    feedback.textContent = 'Clique sur la carte pour poser ton guess.';
+    return;
+  }
 
-  const countryOk = guessedCountry === normalize(state.currentPhoto.country);
   const dateOk = !state.includeDate || guessedDate === state.currentPhoto.takenAt;
-
-  const locationText = countryOk ? 'Lieu correct' : `Lieu faux. Réponse: ${state.currentPhoto.country || 'inconnu'}`;
+  const distance = distanceKm(state.guessCoordinates, state.currentPhoto);
+  const location = state.currentPhoto.locationLabel || state.currentPhoto.country || 'lieu inconnu';
+  const locationText = `Lieu réel: ${location} • Erreur: ${Math.round(distance).toLocaleString('fr-FR')} km`;
   const dateText = state.includeDate
     ? dateOk
       ? 'Date correcte'
@@ -309,11 +488,23 @@ guessForm.addEventListener('submit', (event) => {
     : '';
 
   feedback.textContent = `${locationText}${dateText ? ` • ${dateText}` : ''}`;
+  state.resultVisible = true;
+  drawMapOverlay();
   nextPhotoButton.classList.remove('hidden');
 });
 
 nextPhotoButton.addEventListener('click', () => {
   showCurrentPhoto();
+});
+
+window.addEventListener('resize', () => {
+  if (!state.currentPhoto) {
+    return;
+  }
+
+  if (state.guessCoordinates || state.resultVisible) {
+    drawMapOverlay();
+  }
 });
 
 (async function restoreSettings() {
