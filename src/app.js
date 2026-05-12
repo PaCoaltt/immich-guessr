@@ -31,7 +31,9 @@ const demoPhotos = [
 const state = {
   photos: [],
   currentPhoto: null,
-  includeDate: true
+  includeDate: true,
+  apiKey: '',
+  activeBlobUrl: ''
 };
 
 function normalize(value) {
@@ -58,18 +60,58 @@ function sanitizeImageUrl(value) {
   }
 }
 
-function renderPhoto(photo) {
-  const safeImageUrl = sanitizeImageUrl(photo.imageUrl);
-  if (!safeImageUrl) {
-    setPhotoPlaceholder('Photo non affichable.');
+function clearActiveBlobUrl() {
+  if (!state.activeBlobUrl) {
     return;
   }
 
-  photoWrapper.replaceChildren();
-  const image = document.createElement('img');
-  image.src = safeImageUrl;
-  image.alt = 'Photo à deviner';
-  photoWrapper.append(image);
+  URL.revokeObjectURL(state.activeBlobUrl);
+  state.activeBlobUrl = '';
+}
+
+async function getRenderableImageUrl(photo) {
+  const safeImageUrl = sanitizeImageUrl(photo.imageUrl);
+  if (!safeImageUrl) {
+    return '';
+  }
+
+  if (photo.source !== 'immich') {
+    clearActiveBlobUrl();
+    return safeImageUrl;
+  }
+
+  const response = await fetch(safeImageUrl, {
+    headers: {
+      Accept: 'image/*',
+      'x-api-key': state.apiKey
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  clearActiveBlobUrl();
+  state.activeBlobUrl = URL.createObjectURL(await response.blob());
+  return state.activeBlobUrl;
+}
+
+async function renderPhoto(photo) {
+  try {
+    const imageUrl = await getRenderableImageUrl(photo);
+    if (!imageUrl) {
+      setPhotoPlaceholder('Photo non affichable.');
+      return;
+    }
+
+    photoWrapper.replaceChildren();
+    const image = document.createElement('img');
+    image.src = imageUrl;
+    image.alt = 'Photo à deviner';
+    photoWrapper.append(image);
+  } catch (error) {
+    setPhotoPlaceholder('Impossible de charger cette photo Immich.');
+  }
 }
 
 function getRandomPhoto() {
@@ -81,7 +123,7 @@ function getRandomPhoto() {
   return state.photos[index];
 }
 
-function showCurrentPhoto() {
+async function showCurrentPhoto() {
   state.currentPhoto = getRandomPhoto();
   if (!state.currentPhoto) {
     setPhotoPlaceholder('Aucune photo disponible avec ces paramètres.');
@@ -90,7 +132,7 @@ function showCurrentPhoto() {
     return;
   }
 
-  renderPhoto(state.currentPhoto);
+  await renderPhoto(state.currentPhoto);
   feedback.textContent = '';
   guessForm.reset();
   includeDateInput.checked = state.includeDate;
@@ -112,6 +154,7 @@ function parseImmichPhoto(serverUrl, asset) {
   return {
     id: safeId,
     imageUrl: `${serverUrl}/api/assets/${safeId}/thumbnail`,
+    source: 'immich',
     country,
     takenAt
   };
@@ -128,21 +171,47 @@ async function ensureHostPermission(serverUrl) {
 
 async function fetchImmichPhotos(serverUrl, apiKey) {
   const cleanServerUrl = serverUrl.replace(/\/$/, '');
-  const endpoints = [
-    `${cleanServerUrl}/api/assets?page=1&size=200`,
-    `${cleanServerUrl}/api/assets?take=200`
-  ];
-
-  let lastError = null;
-
-  for (const endpoint of endpoints) {
-    try {
-      const response = await fetch(endpoint, {
+  const requests = [
+    {
+      endpoint: `${cleanServerUrl}/api/search/metadata`,
+      init: {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey
+        },
+        body: JSON.stringify({
+          page: 1,
+          size: 200
+        })
+      }
+    },
+    {
+      endpoint: `${cleanServerUrl}/api/assets?page=1&size=200`,
+      init: {
         headers: {
           Accept: 'application/json',
           'x-api-key': apiKey
         }
-      });
+      }
+    },
+    {
+      endpoint: `${cleanServerUrl}/api/assets?take=200`,
+      init: {
+        headers: {
+          Accept: 'application/json',
+          'x-api-key': apiKey
+        }
+      }
+    }
+  ];
+
+  let lastError = null;
+
+  for (const request of requests) {
+    try {
+      const response = await fetch(request.endpoint, request.init);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -153,6 +222,8 @@ async function fetchImmichPhotos(serverUrl, apiKey) {
         ? data
         : Array.isArray(data?.assets)
           ? data.assets
+          : Array.isArray(data?.assets?.items)
+            ? data.assets.items
           : Array.isArray(data?.items)
             ? data.items
             : [];
@@ -177,7 +248,8 @@ settingsForm.addEventListener('submit', async (event) => {
   const countryFilter = document.getElementById('country-filter').value.trim();
   state.includeDate = includeDateInput.checked;
 
-  let photos = [...demoPhotos];
+  let photos = [];
+  state.apiKey = '';
 
   if (serverUrl && apiKey) {
     try {
@@ -187,11 +259,13 @@ settingsForm.addEventListener('submit', async (event) => {
       }
 
       photos = await fetchImmichPhotos(serverUrl, apiKey);
+      state.apiKey = apiKey;
       settingsStatus.textContent = `Photos chargées depuis Immich: ${photos.length}`;
     } catch (error) {
-      settingsStatus.textContent = `Échec du chargement Immich (${error.message}), passage en mode démo.`;
+      settingsStatus.textContent = `Échec du chargement Immich (${error.message}). Vérifie l'URL, la clé API et les droits.`;
     }
   } else {
+    photos = [...demoPhotos];
     settingsStatus.textContent = 'Mode démo actif (renseigne URL + clé API pour Immich).';
   }
 
