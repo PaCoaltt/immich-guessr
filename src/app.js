@@ -11,6 +11,8 @@ const guessMapTiles = document.getElementById('guess-map-tiles');
 const mapLines = document.getElementById('map-lines');
 const mapMarkers = document.getElementById('map-markers');
 const mapDistance = document.getElementById('map-distance');
+const IMMICH_PAGE_SIZE = 200;
+const IMMICH_MAX_PAGES = 200;
 
 const demoPhotos = [
   {
@@ -392,8 +394,14 @@ function getRandomInt(maxExclusive) {
 
   if (globalThis.crypto?.getRandomValues) {
     const randomValues = new Uint32Array(1);
-    globalThis.crypto.getRandomValues(randomValues);
-    return randomValues[0] % maxExclusive;
+    const maxUint32 = 2 ** 32;
+    const limit = Math.floor(maxUint32 / maxExclusive) * maxExclusive;
+    let randomValue = 0;
+    do {
+      globalThis.crypto.getRandomValues(randomValues);
+      randomValue = randomValues[0];
+    } while (randomValue >= limit);
+    return randomValue % maxExclusive;
   }
 
   return Math.floor(Math.random() * maxExclusive);
@@ -526,9 +534,8 @@ function hasMorePages(data, assetsLength, pageSize, page) {
 
 async function loadAllPages({ makeRequest, pageSize }) {
   const collected = [];
-  const maxPages = 200;
 
-  for (let page = 1; page <= maxPages; page += 1) {
+  for (let page = 1; page <= IMMICH_MAX_PAGES; page += 1) {
     const response = await makeRequest(page);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -555,11 +562,10 @@ async function fetchImmichPhotos(serverUrl, apiKey) {
     Accept: 'application/json',
     'x-api-key': apiKey
   };
-  const pageSize = 200;
 
   const loaders = [
     () => loadAllPages({
-      pageSize,
+      pageSize: IMMICH_PAGE_SIZE,
       makeRequest: (page) => fetch(`${cleanServerUrl}/api/search/metadata`, {
         method: 'POST',
         headers: {
@@ -568,20 +574,20 @@ async function fetchImmichPhotos(serverUrl, apiKey) {
         },
         body: JSON.stringify({
           page,
-          size: pageSize,
+          size: IMMICH_PAGE_SIZE,
           withExif: true
         })
       })
     }),
     () => loadAllPages({
-      pageSize,
-      makeRequest: (page) => fetch(`${cleanServerUrl}/api/assets?page=${page}&size=${pageSize}&withExif=true`, { headers })
+      pageSize: IMMICH_PAGE_SIZE,
+      makeRequest: (page) => fetch(`${cleanServerUrl}/api/assets?page=${page}&size=${IMMICH_PAGE_SIZE}&withExif=true`, { headers })
     }),
     () => loadAllPages({
-      pageSize,
+      pageSize: IMMICH_PAGE_SIZE,
       makeRequest: (page) => {
-        const skip = (page - 1) * pageSize;
-        return fetch(`${cleanServerUrl}/api/assets?take=${pageSize}&skip=${skip}&withExif=true`, { headers });
+        const skip = (page - 1) * IMMICH_PAGE_SIZE;
+        return fetch(`${cleanServerUrl}/api/assets?take=${IMMICH_PAGE_SIZE}&skip=${skip}&withExif=true`, { headers });
       }
     })
   ];
