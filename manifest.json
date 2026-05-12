@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Immich Guessr",
+  "description": "Un mode Guessr avec les photos de votre instance Immich.",
+  "version": "0.1.0",
+  "permissions": ["storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_title": "Ouvrir Immich Guessr"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

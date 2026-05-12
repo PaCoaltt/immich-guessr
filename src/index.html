@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Immich Guessr</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="panel title-panel">
+        <h1>IMMICH GUESSR</h1>
+        <p>Trouve le lieu et, si activé, la date de prise de vue.</p>
+      </header>
+
+      <section class="layout">
+        <aside class="panel settings-panel">
+          <h2>PARAMÈTRES</h2>
+          <form id="settings-form">
+            <label>
+              URL Immich
+              <input id="server-url" type="url" placeholder="https://immich.example.com" />
+            </label>
+            <label>
+              Clé API Immich
+              <input id="api-key" type="password" placeholder="immich-api-key" />
+            </label>
+            <label>
+              Pays imposé (optionnel)
+              <input id="country-filter" type="text" placeholder="France" />
+            </label>
+            <label class="checkbox">
+              <input id="include-date" type="checkbox" checked />
+              Inclure la date à deviner
+            </label>
+            <button type="submit">LANCER</button>
+          </form>
+          <p id="settings-status" class="status"></p>
+        </aside>
+
+        <section class="panel game-panel">
+          <div id="photo-wrapper" class="photo-wrapper">
+            <p class="placeholder">Lance une partie pour afficher une photo.</p>
+          </div>
+
+          <form id="guess-form" class="guess-form hidden">
+            <label>
+              Votre lieu (pays)
+              <input id="guess-country" type="text" required />
+            </label>
+            <label id="guess-date-label">
+              Votre date (YYYY-MM-DD)
+              <input id="guess-date" type="date" />
+            </label>
+            <button type="submit">VALIDER</button>
+          </form>
+
+          <div id="feedback" class="feedback"></div>
+          <button id="next-photo" class="hidden">PHOTO SUIVANTE</button>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

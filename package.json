@@ -1,0 +1,21 @@
+{
+  "name": "immich-guessr-exp",
+  "version": "1.0.0",
+  "description": "Prototype browser extension for Immich Guessr",
+  "main": "src/background.js",
+  "scripts": {
+    "test": "echo \"No tests configured\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PaCoaltt/immich-guessr-exp.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/PaCoaltt/immich-guessr-exp/issues"
+  },
+  "homepage": "https://github.com/PaCoaltt/immich-guessr-exp#readme"
+}
