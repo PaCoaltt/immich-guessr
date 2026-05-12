@@ -26,8 +26,8 @@
               <input id="api-key" type="password" placeholder="immich-api-key" />
             </label>
             <label>
-              Pays imposé (optionnel)
-              <input id="country-filter" type="text" placeholder="France" />
+              Timer (secondes, optionnel)
+              <input id="round-timer-seconds" type="number" min="0" step="1" placeholder="60" />
             </label>
             <label class="checkbox">
               <input id="include-date" type="checkbox" checked />
@@ -58,8 +58,10 @@
                     <div id="map-markers" class="map-markers" aria-hidden="true"></div>
                     <div id="map-distance" class="map-distance hidden"></div>
                   </div>
+                  <button id="guess-submit" class="map-submit-floating" type="submit">VALIDER</button>
                 </div>
                 <p class="map-attribution">© OpenStreetMap contributors</p>
+                <p id="round-timer-status" class="round-timer-status hidden"></p>
               </div>
             </div>
 
@@ -67,11 +69,9 @@
               Votre date (YYYY-MM-DD)
               <input id="guess-date" type="date" />
             </label>
-            <button type="submit">VALIDER</button>
           </form>
 
           <div id="feedback" class="feedback"></div>
-          <button id="next-photo" class="hidden">PHOTO SUIVANTE</button>
         </section>
       </section>
     </main>

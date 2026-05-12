@@ -142,6 +142,7 @@ button:hover {
 }
 
 .guess-map-frame {
+  position: relative;
   border: 4px solid var(--ink);
   background: #7ec8ff;
   padding: 0;
@@ -160,12 +161,24 @@ button:hover {
 .guess-map-viewport {
   position: absolute;
   inset: 0;
-  transition: transform 0.2s ease;
+  transition: transform 0.35s ease;
 }
 
 .guess-map:hover .guess-map-viewport {
-  transform: scale(1.05);
+  transform: scale(1.015);
   transform-origin: 50% 50%;
+}
+
+.map-submit-floating {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  z-index: 5;
 }
 
 .guess-map-tiles {
@@ -232,6 +245,11 @@ button:hover {
   text-transform: none;
 }
 
+.round-timer-status {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+}
+
 .feedback {
   margin-top: 12px;
   min-height: 2em;
@@ -242,10 +260,6 @@ button:hover {
 
 .hidden {
   display: none;
-}
-
-#next-photo {
-  margin-top: 12px;
 }
 
 @media (max-width: 1000px) {
