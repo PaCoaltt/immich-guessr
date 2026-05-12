@@ -86,6 +86,20 @@ function hasCoordinates(photo) {
   return Number.isFinite(photo?.latitude) && Number.isFinite(photo?.longitude);
 }
 
+function getRandomIndex(maxExclusive) {
+  if (!Number.isInteger(maxExclusive) || maxExclusive <= 0) {
+    return 0;
+  }
+
+  if (globalThis.crypto?.getRandomValues) {
+    const randomValues = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(randomValues);
+    return randomValues[0] % maxExclusive;
+  }
+
+  return Date.now() % maxExclusive;
+}
+
 function normalizeCoordinates(latitude, longitude) {
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     return null;
@@ -159,7 +173,7 @@ function drawMapOverlay() {
     return;
   }
 
-  mapMarkers.append(createMarker(guessPoint, 'guess', 'Votre guess'));
+  mapMarkers.append(createMarker(guessPoint, 'guess', 'Votre supposition'));
   if (!state.resultVisible || !hasCoordinates(state.currentPhoto)) {
     return;
   }
@@ -274,7 +288,7 @@ function getRandomPhoto() {
     return null;
   }
 
-  const index = Math.floor(Math.random() * playablePhotos.length);
+  const index = getRandomIndex(playablePhotos.length);
   return playablePhotos[index];
 }
 
@@ -461,7 +475,7 @@ guessMap.addEventListener('click', (event) => {
 
   state.guessCoordinates = coordinates;
   drawMapOverlay();
-  feedback.textContent = `Guess placé: ${coordinates.latitude.toFixed(3)}, ${coordinates.longitude.toFixed(3)}`;
+  feedback.textContent = `Supposition placée: ${coordinates.latitude.toFixed(3)}, ${coordinates.longitude.toFixed(3)}`;
 });
 
 guessForm.addEventListener('submit', (event) => {
@@ -473,7 +487,7 @@ guessForm.addEventListener('submit', (event) => {
 
   const guessedDate = document.getElementById('guess-date').value;
   if (!state.guessCoordinates) {
-    feedback.textContent = 'Clique sur la carte pour poser ton guess.';
+    feedback.textContent = 'Clique sur la carte pour poser ta supposition.';
     return;
   }
 
