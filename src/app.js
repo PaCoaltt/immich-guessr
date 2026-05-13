@@ -21,6 +21,8 @@ const MAP_MAX_ZOOM = 19;
 const MAP_MAX_REVEAL_ZOOM = 6;
 const MAP_REVEAL_PADDING_PX = 28;
 const MAP_REVEAL_ANIMATION_MS = 900;
+const MAP_WHEEL_COOLDOWN_MS = 70;
+const MAP_WHEEL_STEP_DELTA = 120;
 
 const demoPhotos = [
   {
@@ -74,7 +76,9 @@ const state = {
     dragStartPoint: null,
     dragStartCenterWorld: null,
     dragMoved: false,
-    revealAnimationFrame: null
+    revealAnimationFrame: null,
+    wheelAccumulator: 0,
+    lastWheelZoomAt: 0
   }
 };
 
@@ -962,7 +966,21 @@ settingsForm.addEventListener('submit', async (event) => {
 
 guessMap.addEventListener('wheel', (event) => {
   event.preventDefault();
-  const direction = event.deltaY > 0 ? -1 : 1;
+  const deltaMultiplier = event.deltaMode === 1 ? 16 : (event.deltaMode === 2 ? 256 : 1);
+  state.map.wheelAccumulator += event.deltaY * deltaMultiplier;
+
+  const now = performance.now();
+  if (now - state.map.lastWheelZoomAt < MAP_WHEEL_COOLDOWN_MS) {
+    return;
+  }
+
+  if (Math.abs(state.map.wheelAccumulator) < MAP_WHEEL_STEP_DELTA) {
+    return;
+  }
+
+  const direction = state.map.wheelAccumulator > 0 ? -1 : 1;
+  state.map.wheelAccumulator = 0;
+  state.map.lastWheelZoomAt = now;
   const nextZoom = state.map.zoom + direction;
   setMapZoom(nextZoom, event.clientX, event.clientY);
 }, { passive: false });
