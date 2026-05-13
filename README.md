@@ -1,37 +1,21 @@
-# Immich Guessr
+# Immich Guessr (browser extension)
 
-Immich Guessr est une extension navigateur qui transforme ta photothèque Immich en jeu de géolocalisation.
-Le principe est simple : une photo s’affiche, tu observes les indices visuels, puis tu places ton estimation sur la carte.
+Immich Guessr is a game inspired by GeoGuessr. Here you don't guess for Street View images, but for your own pictures from Immich. 
+Browser extension prototype that opens **Immich Guessr** in full-page mode, with a brutalist UI.
 
-## Concept
+## Code
+This extension/game is vibe-coded. I'm not a pro developer, so it may have some problems. I've done my best. 
+You can open a issue or write me at : contact@lupachat.ch
 
-Le projet reprend l’esprit d’un jeu “guessr”, mais avec tes propres souvenirs :
+## Features
 
-- les images sont chargées depuis ton serveur Immich ;
-- seules les photos avec coordonnées GPS sont jouables ;
-- tu peux comparer ton intuition à la position réelle après validation.
+- Full-application view opened from the extension icon (new tab)
+- Brutalist style inspired by games.
+- Game settings:
+  - Country filter
+  - Place-only mode / place + date mode
+- Photo loading from Immich (URL + API key), with demo mode as fallback
+- Location guessing by clicking on a world map
+- After validation: displays the guess and the real location connected by a dotted line with error distance
 
-Résultat : un jeu rapide, personnel, et idéal pour redécouvrir sa bibliothèque photo autrement.
-
-## Fonctionnement
-
-1. Ouvre l’extension depuis l’icône du navigateur.
-2. Renseigne l’URL de ton instance Immich et ta clé API (ou utilise le mode démo).
-3. Lance une partie : une image apparaît.
-4. Clique sur la carte pour poser ta réponse.
-5. Valide pour voir l’écart entre ton choix et la vraie position.
-
-## Installation rapide (Chrome / Chromium)
-
-1. Va sur `chrome://extensions`.
-2. Active le **Mode développeur**.
-3. Clique sur **Charger l’extension non empaquetée**.
-4. Sélectionne le dossier du projet (celui avec `manifest.json`).
-
-## État du projet
-
-Prototype fonctionnel, orienté expérimentation produit/UX :
-
-- interface en français ;
-- chargement Immich compatible avec plusieurs endpoints ;
-- permissions d’accès demandées uniquement pour le domaine Immich configuré.
+Made with 💚 by PaCoaltt
