@@ -3,18 +3,27 @@
   "name": "Immich Guessr",
   "description": "Un mode Guessr avec les photos de votre instance Immich.",
   "version": "0.1.0",
-  "permissions": ["storage"],
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "permissions": [
+    "storage"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
   "background": {
     "service_worker": "src/background.js",
-    "scripts": ["src/background.js"]
+    "scripts": [
+      "src/background.js"
+    ]
   },
   "browser_specific_settings": {
     "gecko": {
       "id": "immich-guessr@local",
+      "strict_min_version": "128.0",
       "data_collection_permissions": {
-        "required": [],
-        "optional": []
+        "required": [
+          "none"
+        ]
       }
     }
   },
