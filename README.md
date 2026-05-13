@@ -1,33 +1,37 @@
-# Immich Guessr (browser extension)
+# Immich Guessr
 
-Browser extension prototype that opens **Immich Guessr** in full-page mode, with a brutalist UI.
+Immich Guessr est une extension navigateur qui transforme ta photothèque Immich en jeu de géolocalisation.
+Le principe est simple : une photo s’affiche, tu observes les indices visuels, puis tu places ton estimation sur la carte.
 
-## Features
+## Concept
 
-- Full-application view opened from the extension icon (new tab)
-- Brutalist style inspired by games like `rentguessr.fun`
-- Game settings:
-  - Country filter
-  - Place-only mode / place + date mode
-- Photo loading from Immich (URL + API key), with demo mode as fallback
-- Location guessing by clicking on a world map
-- After validation: displays the guess and the real location connected by a dotted line with error distance
+Le projet reprend l’esprit d’un jeu “guessr”, mais avec tes propres souvenirs :
 
-## Installation (Chrome/Chromium)
+- les images sont chargées depuis ton serveur Immich ;
+- seules les photos avec coordonnées GPS sont jouables ;
+- tu peux comparer ton intuition à la position réelle après validation.
 
-1. Open `chrome://extensions`
-2. Enable Developer mode
-3. Click **Load unpacked**
-4. Select this repository's root folder (the folder that contains `manifest.json`)
-5. Click the extension icon to open the game
+Résultat : un jeu rapide, personnel, et idéal pour redécouvrir sa bibliothèque photo autrement.
 
-## Notes
+## Fonctionnement
 
-- The interface is currently in French (`lang="fr"`).
-- Internationalization is not implemented yet (the prototype currently targets French first).
-- The prototype tries multiple Immich endpoints to stay compatible across versions.
-- Immich loading is limited to the first 200 retrieved assets.
-- Only photos with GPS coordinates are playable.
-- Broad host permissions are declared as **optional** and are requested only when you start a game with your Immich URL.
-- The extension will ask permission to access the configured Immich domain.
-- If Immich loading fails with URL + API key, demo mode is not enabled automatically (to avoid confusion).
+1. Ouvre l’extension depuis l’icône du navigateur.
+2. Renseigne l’URL de ton instance Immich et ta clé API (ou utilise le mode démo).
+3. Lance une partie : une image apparaît.
+4. Clique sur la carte pour poser ta réponse.
+5. Valide pour voir l’écart entre ton choix et la vraie position.
+
+## Installation rapide (Chrome / Chromium)
+
+1. Va sur `chrome://extensions`.
+2. Active le **Mode développeur**.
+3. Clique sur **Charger l’extension non empaquetée**.
+4. Sélectionne le dossier du projet (celui avec `manifest.json`).
+
+## État du projet
+
+Prototype fonctionnel, orienté expérimentation produit/UX :
+
+- interface en français ;
+- chargement Immich compatible avec plusieurs endpoints ;
+- permissions d’accès demandées uniquement pour le domaine Immich configuré.
