@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,30 +10,30 @@
     <main class="page">
       <header class="panel title-panel">
         <h1>IMMICH GUESSR</h1>
-        <p>Trouve le lieu et, si activé, la date de prise de vue.</p>
+        <p>Find the location and, if enabled, the capture date.</p>
       </header>
 
       <section class="layout">
         <aside class="panel settings-panel">
-          <h2>PARAMÈTRES</h2>
+          <h2>SETTINGS</h2>
           <form id="settings-form">
             <label>
-              URL Immich
+              Immich URL
               <input id="server-url" type="url" placeholder="https://immich.example.com" />
             </label>
             <label>
-              Clé API Immich
+              Immich API key
               <input id="api-key" type="password" placeholder="immich-api-key" />
             </label>
             <label>
-              Timer (secondes, optionnel)
+              Timer (seconds, optional)
               <input id="round-timer-seconds" type="number" min="0" step="1" placeholder="60" />
             </label>
             <label class="checkbox">
               <input id="include-date" type="checkbox" checked />
-              Inclure la date à deviner
+              Include date guess
             </label>
-            <button type="submit">LANCER</button>
+            <button type="submit">START</button>
           </form>
           <p id="settings-status" class="status"></p>
         </aside>
@@ -42,15 +42,15 @@
           <form id="guess-form" class="guess-form hidden">
             <div class="game-main">
               <div id="photo-wrapper" class="photo-wrapper">
-                <p class="placeholder">Lance une partie pour afficher une photo.</p>
+                <p class="placeholder">Start a game to display a photo.</p>
               </div>
 
               <div class="map-panel">
                 <label class="map-label">
-                  Votre supposition (cliquez sur la carte)
+                  Your guess (click on the map)
                 </label>
                 <div class="guess-map-frame">
-                  <div id="guess-map" class="guess-map" aria-label="Carte de supposition">
+                  <div id="guess-map" class="guess-map" aria-label="Guess map">
                     <div id="map-viewport" class="guess-map-viewport" aria-hidden="true">
                       <div id="guess-map-tiles" class="guess-map-tiles"></div>
                     </div>
@@ -58,7 +58,7 @@
                     <div id="map-markers" class="map-markers" aria-hidden="true"></div>
                     <div id="map-distance" class="map-distance hidden"></div>
                   </div>
-                  <button id="guess-submit" class="map-submit-floating" type="submit">VALIDER</button>
+                  <button id="guess-submit" class="map-submit-floating" type="submit">SUBMIT</button>
                 </div>
                 <p class="map-attribution">© OpenStreetMap contributors</p>
                 <p id="round-timer-status" class="round-timer-status hidden"></p>
@@ -66,7 +66,7 @@
             </div>
 
             <label id="guess-date-label">
-              Votre date (YYYY-MM-DD)
+              Your date (YYYY-MM-DD)
               <input id="guess-date" type="date" />
             </label>
           </form>

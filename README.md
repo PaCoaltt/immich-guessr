@@ -1,33 +1,33 @@
-# Immich Guessr (extension navigateur)
+# Immich Guessr (browser extension)
 
-Prototype d'extension navigateur qui ouvre **Immich Guessr** en pleine page, avec une UI brutaliste.
+Browser extension prototype that opens **Immich Guessr** in full-page mode, with a brutalist UI.
 
-## Fonctionnalités
+## Features
 
-- Ouverture en plein écran applicatif via l'icône de l'extension (nouvel onglet)
-- Style brutaliste inspiré des jeux type `rentguessr.fun`
-- Paramètres de partie:
-  - Filtre par pays
-  - Mode lieu seul / lieu + date
-- Chargement des photos depuis Immich (URL + clé API), avec mode démo en fallback
-- Guess du lieu via clic sur une carte mondiale
-- Après validation: affichage du guess + lieu réel reliés par un trait pointillé avec distance d'erreur
+- Full-application view opened from the extension icon (new tab)
+- Brutalist style inspired by games like `rentguessr.fun`
+- Game settings:
+  - Country filter
+  - Place-only mode / place + date mode
+- Photo loading from Immich (URL + API key), with demo mode as fallback
+- Location guessing by clicking on a world map
+- After validation: displays the guess and the real location connected by a dotted line with error distance
 
 ## Installation (Chrome/Chromium)
 
-1. Ouvrir `chrome://extensions`
-2. Activer le mode développeur
-3. Cliquer sur **Load unpacked**
-4. Sélectionner le dossier racine de ce dépôt (le dossier qui contient `manifest.json`)
-5. Cliquer sur l'icône de l'extension pour ouvrir le jeu
+1. Open `chrome://extensions`
+2. Enable Developer mode
+3. Click **Load unpacked**
+4. Select this repository's root folder (the folder that contains `manifest.json`)
+5. Click the extension icon to open the game
 
 ## Notes
 
-- L'interface est actuellement en français (`lang="fr"`).
-- Aucune internationalisation n'est encore implémentée (le prototype cible d'abord le français).
-- Le prototype tente plusieurs endpoints Immich pour rester compatible selon versions.
-- Le chargement Immich est limité aux 200 premiers assets récupérés.
-- Seules les photos avec coordonnées GPS sont jouables.
-- Les permissions hôtes larges sont déclarées en **optionnel** et ne sont demandées qu'au moment où vous lancez une partie avec votre URL Immich.
-- L'extension demandera l'autorisation d'accéder au domaine Immich renseigné.
-- Si le chargement Immich échoue avec URL + clé API, le mode démo n'est pas activé automatiquement (pour éviter toute confusion).
+- The interface is currently in French (`lang="fr"`).
+- Internationalization is not implemented yet (the prototype currently targets French first).
+- The prototype tries multiple Immich endpoints to stay compatible across versions.
+- Immich loading is limited to the first 200 retrieved assets.
+- Only photos with GPS coordinates are playable.
+- Broad host permissions are declared as **optional** and are requested only when you start a game with your Immich URL.
+- The extension will ask permission to access the configured Immich domain.
+- If Immich loading fails with URL + API key, demo mode is not enabled automatically (to avoid confusion).
