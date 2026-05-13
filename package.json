@@ -4,7 +4,9 @@
   "description": "Prototype browser extension for Immich Guessr",
   "main": "src/background.js",
   "scripts": {
-    "test": "echo \"No tests configured\""
+    "test": "echo \"No tests configured\"",
+    "check:manifest": "node scripts_check_manifest.js",
+    "check:json": "node scripts_check_json.js"
   },
   "repository": {
     "type": "git",
