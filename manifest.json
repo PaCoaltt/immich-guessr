@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Immich Guessr",
-  "description": "Un mode Guessr avec les photos de votre instance Immich.",
+  "description": "A Guessr mode powered by photos from your Immich instance.",
   "version": "0.1.0",
   "permissions": [
     "storage"
@@ -28,6 +28,6 @@
     }
   },
   "action": {
-    "default_title": "Ouvrir Immich Guessr"
+    "default_title": "Open Immich Guessr"
   }
 }

@@ -295,7 +295,7 @@ function drawMapOverlay() {
   if (state.guessCoordinates) {
     guessPoint = coordinatesToPoint(state.guessCoordinates.latitude, state.guessCoordinates.longitude);
     if (guessPoint) {
-      mapMarkers.append(createMarker(guessPoint, 'guess', 'Votre supposition'));
+      mapMarkers.append(createMarker(guessPoint, 'guess', 'Your guess'));
     }
   }
 
@@ -308,7 +308,7 @@ function drawMapOverlay() {
     return;
   }
 
-  mapMarkers.append(createMarker(realPoint, 'actual', state.currentPhoto.locationLabel || state.currentPhoto.country || 'Lieu réel'));
+  mapMarkers.append(createMarker(realPoint, 'actual', state.currentPhoto.locationLabel || state.currentPhoto.country || 'Actual location'));
 
   if (guessPoint && state.guessCoordinates) {
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -322,7 +322,7 @@ function drawMapOverlay() {
     const shownDistance = Number.isFinite(state.resultDistanceKm)
       ? state.resultDistanceKm
       : distanceKm(state.guessCoordinates, state.currentPhoto);
-    mapDistance.textContent = `Distance: ${Math.round(shownDistance).toLocaleString('fr-FR')} km`;
+    mapDistance.textContent = `Distance: ${Math.round(shownDistance).toLocaleString('en-US')} km`;
     mapDistance.classList.remove('hidden');
   }
 }
@@ -483,7 +483,7 @@ function updateTimerDisplay(secondsLeft) {
     return;
   }
 
-  roundTimerStatus.textContent = `Temps restant: ${formatSeconds(secondsLeft)}`;
+  roundTimerStatus.textContent = `Time left: ${formatSeconds(secondsLeft)}`;
   roundTimerStatus.classList.remove('hidden');
 }
 
@@ -520,33 +520,33 @@ function revealRound(timeExpired = false) {
   }
 
   const guessedDate = document.getElementById('guess-date').value;
-  const location = state.currentPhoto.locationLabel || state.currentPhoto.country || 'lieu inconnu';
-  let locationText = `Lieu réel: ${location}`;
+  const location = state.currentPhoto.locationLabel || state.currentPhoto.country || 'unknown location';
+  let locationText = `Actual location: ${location}`;
   let dateText = '';
   state.resultVisible = true;
 
   if (state.guessCoordinates) {
     const distance = distanceKm(state.guessCoordinates, state.currentPhoto);
     state.resultDistanceKm = distance;
-    locationText = `${locationText} • Distance: ${Math.round(distance).toLocaleString('fr-FR')} km`;
+    locationText = `${locationText} • Distance: ${Math.round(distance).toLocaleString('en-US')} km`;
     const dateOk = !state.includeDate || guessedDate === state.currentPhoto.takenAt;
     dateText = state.includeDate
       ? dateOk
-        ? 'Date correcte'
-        : `Date fausse. Réponse: ${state.currentPhoto.takenAt || 'inconnue'}`
+        ? 'Date correct'
+        : `Wrong date. Answer: ${state.currentPhoto.takenAt || 'unknown'}`
       : '';
     fitMapForReveal(state.guessCoordinates, state.currentPhoto);
   } else {
     state.resultDistanceKm = null;
     dateText = timeExpired
-      ? 'Temps écoulé (aucune supposition)'
-      : 'Aucune supposition';
+      ? 'Time expired (no guess)'
+      : 'No guess';
     animateMapViewTo(Math.min(MAP_MAX_REVEAL_ZOOM, 4), state.currentPhoto);
   }
 
   feedback.textContent = `${locationText}${dateText ? ` • ${dateText}` : ''}`;
   stopRoundTimer();
-  guessSubmitButton.textContent = 'MANCHE SUIVANTE';
+  guessSubmitButton.textContent = 'NEXT ROUND';
 }
 
 function setPhotoPlaceholder(message) {
@@ -614,7 +614,7 @@ async function getRenderableImageUrl(photo) {
 
       const contentType = response.headers.get('content-type') || '';
       if (!contentType.toLowerCase().startsWith('image/')) {
-        throw new Error(`Réponse non image (${contentType || 'type inconnu'})`);
+        throw new Error(`Non-image response (${contentType || 'unknown type'})`);
       }
 
       clearActiveBlobUrl();
@@ -635,20 +635,20 @@ async function renderPhoto(photo) {
   try {
     const imageUrl = await getRenderableImageUrl(photo);
     if (!imageUrl) {
-      setPhotoPlaceholder('Photo non affichable.');
+      setPhotoPlaceholder('Photo cannot be displayed.');
       return;
     }
 
     photoWrapper.replaceChildren();
     const image = document.createElement('img');
     image.src = imageUrl;
-    image.alt = 'Photo à deviner';
+    image.alt = 'Photo to guess';
     photoWrapper.append(image);
   } catch (error) {
     const details = error?.message ? `: ${error.message}` : '';
     const message = photo.source === 'immich'
-      ? `Impossible de charger cette photo Immich${details}`
-      : 'Photo non affichable.';
+      ? `Unable to load this Immich photo${details}`
+      : 'Photo cannot be displayed.';
     setPhotoPlaceholder(message);
   }
 }
@@ -699,7 +699,7 @@ async function showCurrentPhoto() {
   stopRoundTimer();
   state.currentPhoto = getRandomPhoto();
   if (!state.currentPhoto) {
-    setPhotoPlaceholder('Aucune photo géolocalisée disponible avec ces paramètres.');
+    setPhotoPlaceholder('No geotagged photo available with these settings.');
     guessForm.classList.add('hidden');
     updateTimerDisplay(0);
     return;
@@ -716,7 +716,7 @@ async function showCurrentPhoto() {
   drawMapOverlay();
   includeDateInput.checked = state.includeDate;
   guessDateLabel.classList.toggle('hidden', !state.includeDate);
-  guessSubmitButton.textContent = 'VALIDER';
+  guessSubmitButton.textContent = 'SUBMIT';
   guessForm.classList.remove('hidden');
   startRoundTimer();
 }
@@ -879,7 +879,7 @@ async function fetchImmichPhotos(serverUrl, apiKey) {
   }
 
   const details = lastError?.message ? ` (${lastError.message})` : '';
-  throw new Error(`Impossible de charger les photos Immich${details}.`);
+  throw new Error(`Unable to load Immich photos${details}.`);
 }
 
 function setGuessAtPoint(clientX, clientY) {
@@ -895,7 +895,7 @@ function setGuessAtPoint(clientX, clientY) {
   state.guessCoordinates = coordinates;
   state.resultDistanceKm = null;
   drawMapOverlay();
-  feedback.textContent = `Supposition placée: ${coordinates.latitude.toFixed(3)}, ${coordinates.longitude.toFixed(3)}`;
+  feedback.textContent = `Guess placed: ${coordinates.latitude.toFixed(3)}, ${coordinates.longitude.toFixed(3)}`;
 }
 
 function setMapZoom(nextZoom, anchorClientX, anchorClientY) {
@@ -923,7 +923,7 @@ function setMapZoom(nextZoom, anchorClientX, anchorClientY) {
 settingsForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   feedback.textContent = '';
-  settingsStatus.textContent = 'Chargement en cours...';
+  settingsStatus.textContent = 'Loading...';
 
   const serverUrl = document.getElementById('server-url').value.trim();
   const apiKey = document.getElementById('api-key').value.trim();
@@ -937,28 +937,28 @@ settingsForm.addEventListener('submit', async (event) => {
     try {
       const hasPermission = await ensureHostPermission(serverUrl);
       if (!hasPermission) {
-        throw new Error('Accès au domaine Immich refusé');
+        throw new Error('Access to Immich domain denied');
       }
 
       photos = await fetchImmichPhotos(serverUrl, apiKey);
       state.apiKey = apiKey;
       const geoCount = photos.filter(hasCoordinates).length;
-      settingsStatus.textContent = `Photos chargées depuis Immich: ${photos.length} (${geoCount} géolocalisées)`;
+      settingsStatus.textContent = `Photos loaded from Immich: ${photos.length} (${geoCount} geotagged)`;
     } catch (error) {
       state.apiKey = '';
-      settingsStatus.textContent = `Échec du chargement Immich (${error.message}). Vérifiez l'URL, la clé API et les droits.`;
+      settingsStatus.textContent = `Immich loading failed (${error.message}). Check the URL, API key, and permissions.`;
     }
   } else {
     photos = [...demoPhotos];
     state.apiKey = '';
-    settingsStatus.textContent = 'Mode démo actif (renseigne URL + clé API pour Immich).';
+    settingsStatus.textContent = 'Demo mode active (provide URL + API key for Immich).';
   }
 
   state.photos = photos;
   state.remainingPhotoIds = [];
 
   if (state.photos.length && !state.photos.some(hasCoordinates)) {
-    settingsStatus.textContent = `${settingsStatus.textContent} • Aucune photo avec coordonnées GPS`;
+    settingsStatus.textContent = `${settingsStatus.textContent} • No photo with GPS coordinates`;
   }
 
   showCurrentPhoto();
